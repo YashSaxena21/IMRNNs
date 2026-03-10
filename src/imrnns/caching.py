@@ -5,7 +5,7 @@ import math
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 import torch
 from sentence_transformers import SentenceTransformer
@@ -140,9 +140,10 @@ def build_cache(
     batch_size: int = 64,
     num_negatives: int = 20,
     negative_pool: int = 200,
+    max_queries: Optional[int] = None,
 ) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
-    splits = load_beir_splits(dataset_name, datasets_dir=datasets_dir)
+    splits = load_beir_splits(dataset_name, datasets_dir=datasets_dir, max_queries=max_queries)
     model = SentenceTransformer(encoder_spec.model_name, device=device)
     negative_miner = BM25NegativeMiner()
     corpus = splits["train"].corpus
@@ -176,6 +177,7 @@ def build_cache(
         "cache_dir": str(cache_dir),
         "num_negatives": num_negatives,
         "negative_pool": negative_pool,
+        "max_queries": max_queries,
     }
     with open(cache_dir / "manifest.json", "w") as handle:
         json.dump(manifest, handle, indent=2)

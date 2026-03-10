@@ -48,6 +48,7 @@ Examples:
 - `checkpoints/pretrained/e5/imrnns-e5-fiqa.pt`
 
 These are now real checkpoint files stored inside the repository, not symlinks to an external workspace.
+They are stored in an adapter-only format, so they contain the learned IMRNN projection and adapter weights without bundling the full base retriever.
 
 ## Setup
 

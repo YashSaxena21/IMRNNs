@@ -34,7 +34,10 @@ def save_checkpoint(
 ) -> None:
     payload = {
         "model_state": model.state_dict(),
-        "metadata": metadata,
+        "metadata": {
+            "checkpoint_format": "imrnns-adapter-only-v1",
+            **metadata,
+        },
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(payload, path)
@@ -60,3 +63,21 @@ def load_model(
     model.to(device)
     model.eval()
     return model, metadata, missing, unexpected
+
+
+def convert_legacy_checkpoint(
+    source_path: Path,
+    target_path: Path,
+    metadata: dict[str, Any],
+) -> None:
+    state_dict, existing_metadata = load_checkpoint(source_path)
+    payload = {
+        "model_state": state_dict,
+        "metadata": {
+            "checkpoint_format": "imrnns-adapter-only-v1",
+            **existing_metadata,
+            **metadata,
+        },
+    }
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(payload, target_path)
