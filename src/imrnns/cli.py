@@ -17,7 +17,7 @@ from .beir_data import load_beir_source
 from .caching import build_cache
 from .checkpoints import default_checkpoint_name, load_model, save_checkpoint
 from .data import ContrastiveCachedDataset, load_cached_split
-from .encoders import get_encoder_spec
+from .encoders import normalize_encoder_name, resolve_encoder_spec
 from .evaluation import evaluate_model
 from .model import IMRNN, ModelConfig
 from .training import TrainingConfig, train_model
@@ -25,9 +25,30 @@ from .training import TrainingConfig, train_model
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--assets-root", type=Path, default=default_assets_root())
-    parser.add_argument("--encoder", required=True)
+    parser.add_argument("--encoder")
+    parser.add_argument("--encoder-model-name")
+    parser.add_argument("--embedding-dim", type=int)
+    parser.add_argument("--query-prefix", default="")
+    parser.add_argument("--passage-prefix", default="")
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--device", default="cuda")
+
+
+def _resolve_encoder_spec(args: argparse.Namespace):
+    return resolve_encoder_spec(
+        encoder=args.encoder,
+        encoder_model_name=args.encoder_model_name,
+        embedding_dim=args.embedding_dim,
+        query_prefix=args.query_prefix,
+        passage_prefix=args.passage_prefix,
+    )
+
+
+def _encoder_label(args: argparse.Namespace, encoder_spec) -> str:
+    if args.encoder:
+        normalized = normalize_encoder_name(args.encoder)
+        return "minilm" if normalized == "mini" else normalized
+    return encoder_spec.key.replace("/", "-")
 
 
 def _command_list_assets(args: argparse.Namespace) -> int:
@@ -52,8 +73,9 @@ def _command_list_assets(args: argparse.Namespace) -> int:
 
 
 def _load_training_inputs(args: argparse.Namespace):
-    encoder_spec = get_encoder_spec(args.encoder)
-    cache_dir = args.cache_dir or resolve_cache_dir(args.assets_root, args.encoder, args.dataset)
+    encoder_spec = _resolve_encoder_spec(args)
+    encoder_label = _encoder_label(args, encoder_spec)
+    cache_dir = args.cache_dir or resolve_cache_dir(args.assets_root, encoder_label, args.dataset)
     datasets_dir = args.assets_root / "datasets"
     beir_source = load_beir_source(args.dataset, datasets_dir=datasets_dir, max_queries=args.max_queries)
     train_split = load_cached_split(cache_dir, "train", beir_source, encoder_spec, args.device)
@@ -67,8 +89,9 @@ def _k_values(args: argparse.Namespace) -> list[int]:
 
 
 def _command_cache(args: argparse.Namespace) -> int:
-    encoder_spec = get_encoder_spec(args.encoder)
-    cache_dir = args.cache_dir or (args.assets_root / f"cache_{args.encoder}_{args.dataset}")
+    encoder_spec = _resolve_encoder_spec(args)
+    encoder_label = _encoder_label(args, encoder_spec)
+    cache_dir = args.cache_dir or (args.assets_root / f"cache_{encoder_label}_{args.dataset}")
     built = build_cache(
         dataset_name=args.dataset,
         encoder_spec=encoder_spec,
@@ -79,7 +102,17 @@ def _command_cache(args: argparse.Namespace) -> int:
         num_negatives=args.num_negatives,
         negative_pool=args.negative_pool,
     )
-    print(json.dumps({"cache_dir": str(built), "encoder": args.encoder, "dataset": args.dataset}, indent=2))
+    print(
+        json.dumps(
+            {
+                "cache_dir": str(built),
+                "encoder": encoder_label,
+                "encoder_model_name": encoder_spec.model_name,
+                "dataset": args.dataset,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -130,9 +163,11 @@ def _command_train(args: argparse.Namespace) -> int:
     )
 
     output_dir = args.output_dir or args.assets_root
-    checkpoint_path = output_dir / default_checkpoint_name(args.encoder, args.dataset)
+    encoder_label = _encoder_label(args, encoder_spec)
+    checkpoint_path = output_dir / default_checkpoint_name(encoder_label, args.dataset)
     metadata = {
-        "encoder": args.encoder,
+        "encoder": encoder_label,
+        "encoder_model_name": encoder_spec.model_name,
         "dataset": args.dataset,
         "cache_dir": str(cache_dir),
         "model_config": {
@@ -150,12 +185,13 @@ def _command_train(args: argparse.Namespace) -> int:
 
 
 def _command_evaluate(args: argparse.Namespace) -> int:
-    encoder_spec = get_encoder_spec(args.encoder)
-    cache_dir = args.cache_dir or resolve_cache_dir(args.assets_root, args.encoder, args.dataset)
-    checkpoint_path = args.checkpoint or resolve_checkpoint_path(args.assets_root, args.encoder, args.dataset)
+    encoder_spec = _resolve_encoder_spec(args)
+    encoder_label = _encoder_label(args, encoder_spec)
+    cache_dir = args.cache_dir or resolve_cache_dir(args.assets_root, encoder_label, args.dataset)
+    checkpoint_path = args.checkpoint or resolve_checkpoint_path(args.assets_root, encoder_label, args.dataset)
     if checkpoint_path is None:
         raise FileNotFoundError(
-            f"No checkpoint found for encoder='{args.encoder}' dataset='{args.dataset}'. Provide --checkpoint."
+            f"No checkpoint found for encoder='{encoder_label}' dataset='{args.dataset}'. Provide --checkpoint."
         )
 
     datasets_dir = args.assets_root / "datasets"
@@ -195,7 +231,9 @@ def _command_evaluate(args: argparse.Namespace) -> int:
 
 
 def _command_run(args: argparse.Namespace) -> int:
-    cache_dir = args.cache_dir or (args.assets_root / f"cache_{args.encoder}_{args.dataset}")
+    encoder_spec = _resolve_encoder_spec(args)
+    encoder_label = _encoder_label(args, encoder_spec)
+    cache_dir = args.cache_dir or (args.assets_root / f"cache_{encoder_label}_{args.dataset}")
     if not cache_dir.exists():
         cache_args = argparse.Namespace(**vars(args))
         cache_args.cache_dir = cache_dir

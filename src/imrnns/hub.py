@@ -8,7 +8,7 @@ from typing import Any, Optional
 from huggingface_hub import HfApi, hf_hub_download
 
 from .checkpoints import default_checkpoint_name, load_model
-from .encoders import EncoderSpec, get_encoder_spec, normalize_encoder_name
+from .encoders import EncoderSpec, normalize_encoder_name, resolve_encoder_spec
 from .model import IMRNN, ModelConfig
 
 DEFAULT_REPO_ID = "yashsaxena21/IMRNNs"
@@ -84,18 +84,28 @@ def download_checkpoint(
 
 def load_pretrained(
     *,
-    encoder: str,
+    encoder: Optional[str] = None,
     dataset: str,
     repo_id: str = DEFAULT_REPO_ID,
     device: str = "cpu",
     checkpoint_filename: Optional[str] = None,
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
     revision: Optional[str] = None,
     cache_dir: Optional[Path] = None,
     local_files_only: bool = False,
 ) -> tuple[IMRNN, dict[str, Any], EncoderSpec]:
-    encoder_spec = get_encoder_spec(encoder)
-    pretrained = download_checkpoint(
+    encoder_spec = resolve_encoder_spec(
         encoder=encoder,
+        encoder_model_name=encoder_model_name,
+        embedding_dim=embedding_dim,
+        query_prefix=query_prefix,
+        passage_prefix=passage_prefix,
+    )
+    pretrained = download_checkpoint(
+        encoder=encoder or encoder_spec.key,
         dataset=dataset,
         repo_id=repo_id,
         checkpoint_filename=checkpoint_filename,

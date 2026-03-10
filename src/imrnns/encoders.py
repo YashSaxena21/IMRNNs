@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -52,3 +53,28 @@ def get_encoder_spec(name: str) -> EncoderSpec:
         supported = ", ".join(sorted(ENCODER_SPECS))
         raise ValueError(f"Unsupported encoder '{name}'. Supported encoders: {supported}")
     return ENCODER_SPECS[key]
+
+
+def resolve_encoder_spec(
+    *,
+    encoder: Optional[str] = None,
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
+) -> EncoderSpec:
+    if encoder_model_name is not None:
+        if embedding_dim is None:
+            raise ValueError("embedding_dim is required when encoder_model_name is provided.")
+        key = normalize_encoder_name(encoder or encoder_model_name)
+        return EncoderSpec(
+            key=key,
+            model_name=encoder_model_name,
+            embedding_dim=embedding_dim,
+            query_prefix=query_prefix,
+            passage_prefix=passage_prefix,
+        )
+
+    if encoder is None:
+        raise ValueError("Provide either encoder or encoder_model_name.")
+    return get_encoder_spec(encoder)

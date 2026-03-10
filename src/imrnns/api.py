@@ -7,7 +7,7 @@ from .beir_data import load_beir_source
 from .caching import build_cache
 from .checkpoints import default_checkpoint_name, load_model, save_checkpoint
 from .data import ContrastiveCachedDataset, load_cached_split
-from .encoders import get_encoder_spec
+from .encoders import resolve_encoder_spec
 from .evaluation import evaluate_model
 from .model import IMRNN, ModelConfig
 from .training import TrainingConfig, train_model
@@ -15,17 +15,27 @@ from .training import TrainingConfig, train_model
 
 def cache_embeddings(
     *,
-    encoder: str,
+    encoder: Optional[str],
     dataset: str,
     cache_dir: Path,
     datasets_dir: Path,
     device: str = "cpu",
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
     batch_size: int = 64,
     num_negatives: int = 20,
     negative_pool: int = 200,
     max_queries: Optional[int] = None,
 ) -> Path:
-    encoder_spec = get_encoder_spec(encoder)
+    encoder_spec = resolve_encoder_spec(
+        encoder=encoder,
+        encoder_model_name=encoder_model_name,
+        embedding_dim=embedding_dim,
+        query_prefix=query_prefix,
+        passage_prefix=passage_prefix,
+    )
     return build_cache(
         dataset_name=dataset,
         encoder_spec=encoder_spec,
@@ -41,12 +51,16 @@ def cache_embeddings(
 
 def train(
     *,
-    encoder: str,
+    encoder: Optional[str],
     dataset: str,
     cache_dir: Path,
     datasets_dir: Path,
     output_dir: Path,
     device: str = "cpu",
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
     max_queries: Optional[int] = None,
     batch_size: int = 32,
     epochs: int = 10,
@@ -60,7 +74,13 @@ def train(
     ranking_k: int = 10,
     k: int = 10,
 ) -> dict[str, Any]:
-    encoder_spec = get_encoder_spec(encoder)
+    encoder_spec = resolve_encoder_spec(
+        encoder=encoder,
+        encoder_model_name=encoder_model_name,
+        embedding_dim=embedding_dim,
+        query_prefix=query_prefix,
+        passage_prefix=passage_prefix,
+    )
     beir_source = load_beir_source(dataset, datasets_dir=datasets_dir, max_queries=max_queries)
     train_split = load_cached_split(cache_dir, "train", beir_source, encoder_spec, device)
     val_split = load_cached_split(cache_dir, "val", beir_source, encoder_spec, device)
@@ -104,9 +124,11 @@ def train(
         k_values=[k],
     )
 
-    checkpoint_path = output_dir / default_checkpoint_name(encoder, dataset)
+    checkpoint_stem = encoder or encoder_spec.key
+    checkpoint_path = output_dir / default_checkpoint_name(checkpoint_stem, dataset)
     metadata = {
-        "encoder": encoder,
+        "encoder": checkpoint_stem,
+        "encoder_model_name": encoder_spec.model_name,
         "dataset": dataset,
         "cache_dir": str(cache_dir),
         "model_config": {
@@ -129,12 +151,16 @@ def train(
 
 def evaluate(
     *,
-    encoder: str,
+    encoder: Optional[str],
     dataset: str,
     cache_dir: Path,
     datasets_dir: Path,
     checkpoint_path: Path,
     device: str = "cpu",
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
     max_queries: Optional[int] = None,
     output_dim: int = 256,
     hidden_dim: int = 128,
@@ -143,7 +169,13 @@ def evaluate(
     ranking_k: int = 10,
     k: int = 10,
 ) -> dict[str, Any]:
-    encoder_spec = get_encoder_spec(encoder)
+    encoder_spec = resolve_encoder_spec(
+        encoder=encoder,
+        encoder_model_name=encoder_model_name,
+        embedding_dim=embedding_dim,
+        query_prefix=query_prefix,
+        passage_prefix=passage_prefix,
+    )
     beir_source = load_beir_source(dataset, datasets_dir=datasets_dir, max_queries=max_queries)
     test_split = load_cached_split(cache_dir, "test", beir_source, encoder_spec, device)
     model, metadata, missing, unexpected = load_model(
@@ -175,12 +207,16 @@ def evaluate(
 
 def run(
     *,
-    encoder: str,
+    encoder: Optional[str],
     dataset: str,
     cache_dir: Path,
     datasets_dir: Path,
     output_dir: Path,
     device: str = "cpu",
+    encoder_model_name: Optional[str] = None,
+    embedding_dim: Optional[int] = None,
+    query_prefix: str = "",
+    passage_prefix: str = "",
     max_queries: Optional[int] = None,
     batch_size: int = 32,
     epochs: int = 10,
@@ -202,6 +238,10 @@ def run(
             cache_dir=cache_dir,
             datasets_dir=datasets_dir,
             device=device,
+            encoder_model_name=encoder_model_name,
+            embedding_dim=embedding_dim,
+            query_prefix=query_prefix,
+            passage_prefix=passage_prefix,
             batch_size=batch_size,
             num_negatives=num_negatives,
             negative_pool=negative_pool,
@@ -214,6 +254,10 @@ def run(
         datasets_dir=datasets_dir,
         output_dir=output_dir,
         device=device,
+        encoder_model_name=encoder_model_name,
+        embedding_dim=embedding_dim,
+        query_prefix=query_prefix,
+        passage_prefix=passage_prefix,
         max_queries=max_queries,
         batch_size=batch_size,
         epochs=epochs,

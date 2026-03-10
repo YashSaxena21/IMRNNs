@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Sequence
 
 import torch
 from sentence_transformers import SentenceTransformer
 
+from .checkpoints import load_model
 from .encoders import EncoderSpec
 from .hub import DEFAULT_REPO_ID, load_pretrained
-from .model import IMRNN
+from .model import IMRNN, ModelConfig
+from .encoders import resolve_encoder_spec
 
 
 @dataclass(frozen=True)
@@ -49,17 +52,64 @@ class IMRNNAdapter:
     def from_pretrained(
         cls,
         *,
-        encoder: str,
+        encoder: str | None = None,
         dataset: str,
         repo_id: str = DEFAULT_REPO_ID,
         device: str = "cpu",
+        encoder_model_name: str | None = None,
+        embedding_dim: int | None = None,
+        query_prefix: str = "",
+        passage_prefix: str = "",
     ) -> "IMRNNAdapter":
         model, metadata, encoder_spec = load_pretrained(
             encoder=encoder,
             dataset=dataset,
             repo_id=repo_id,
             device=device,
+            encoder_model_name=encoder_model_name,
+            embedding_dim=embedding_dim,
+            query_prefix=query_prefix,
+            passage_prefix=passage_prefix,
         )
+        encoder_model = SentenceTransformer(encoder_spec.model_name, device=device)
+        return cls(
+            model=model,
+            encoder=encoder_model,
+            encoder_spec=encoder_spec,
+            metadata=metadata,
+            device=device,
+        )
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        *,
+        checkpoint_path: str | Path,
+        encoder: str | None = None,
+        encoder_model_name: str | None = None,
+        embedding_dim: int | None = None,
+        query_prefix: str = "",
+        passage_prefix: str = "",
+        device: str = "cpu",
+    ) -> "IMRNNAdapter":
+        encoder_spec = resolve_encoder_spec(
+            encoder=encoder,
+            encoder_model_name=encoder_model_name,
+            embedding_dim=embedding_dim,
+            query_prefix=query_prefix,
+            passage_prefix=passage_prefix,
+        )
+        model, metadata, missing, unexpected = load_model(
+            checkpoint_path=Path(checkpoint_path),
+            model_config=ModelConfig(input_dim=encoder_spec.embedding_dim),
+            device=device,
+        )
+        metadata = {
+            **metadata,
+            "checkpoint_path": str(checkpoint_path),
+            "missing_keys": missing,
+            "unexpected_keys": unexpected,
+        }
         encoder_model = SentenceTransformer(encoder_spec.model_name, device=device)
         return cls(
             model=model,

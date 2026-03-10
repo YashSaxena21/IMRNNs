@@ -35,6 +35,10 @@ pip install -e .
 ```python
 from imrnns import IMRNNAdapter
 
+# Step 1: load the matching base retriever and the corresponding IMRNN adapter
+# checkpoint for this dataset. Internally this loads:
+# - sentence-transformers/all-MiniLM-L6-v2
+# - checkpoints/pretrained/minilm/imrnns-minilm-trec-covid.pt
 adapter = IMRNNAdapter.from_pretrained(
     encoder="minilm",
     dataset="trec-covid",
@@ -42,6 +46,7 @@ adapter = IMRNNAdapter.from_pretrained(
     device="cpu",
 )
 
+# Step 2: score a small candidate set with the base retriever + IMRNN adapter.
 results = adapter.score(
     query="What is the incubation period of COVID-19?",
     documents=[
@@ -54,6 +59,39 @@ results = adapter.score(
 
 for item in results:
     print(item.rank, item.score, item.text)
+```
+
+`IMRNNAdapter.from_pretrained(...)` first loads the base dense retriever for the selected encoder family and then applies the released IMRNN adapter checkpoint on top of it.
+
+If you trained IMRNN on your own retriever, you can use your own base model and checkpoint directly:
+
+```python
+from imrnns import IMRNNAdapter
+
+adapter = IMRNNAdapter.from_checkpoint(
+    checkpoint_path="my_imrnn_adapter.pt",
+    encoder_model_name="my-org/my-retriever",
+    embedding_dim=768,
+    query_prefix="query: ",
+    passage_prefix="passage: ",
+    device="cpu",
+)
+```
+
+CLI users can do the same with:
+
+```bash
+python -m imrnns evaluate \
+  --encoder-model-name my-org/my-retriever \
+  --embedding-dim 768 \
+  --query-prefix "query: " \
+  --passage-prefix "passage: " \
+  --dataset my-dataset \
+  --cache-dir /path/to/my_cache \
+  --datasets-dir /path/to/datasets \
+  --checkpoint /path/to/my_imrnn_adapter.pt \
+  --device cpu \
+  --k 10
 ```
 
 ## End-to-End Evaluation Demo

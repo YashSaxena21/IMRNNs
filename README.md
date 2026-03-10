@@ -55,6 +55,22 @@ python -m imrnns evaluate \
   --k 10
 ```
 
+Evaluate a custom retriever + custom IMRNN checkpoint:
+
+```bash
+python -m imrnns evaluate \
+  --encoder-model-name my-org/my-retriever \
+  --embedding-dim 768 \
+  --query-prefix "query: " \
+  --passage-prefix "passage: " \
+  --dataset my-dataset \
+  --cache-dir /path/to/my_cache \
+  --datasets-dir /path/to/datasets \
+  --checkpoint /path/to/my_imrnn_adapter.pt \
+  --device cpu \
+  --k 10
+```
+
 Run the full pipeline:
 
 ```bash
@@ -104,6 +120,16 @@ cache_embeddings(
     dataset="trec-covid",
     cache_dir=Path("cache_minilm_trec-covid"),
     datasets_dir=Path("datasets"),
+    device="cpu",
+)
+
+# Custom retriever + custom IMRNN checkpoint.
+custom_adapter = IMRNNAdapter.from_checkpoint(
+    checkpoint_path="my_imrnn_adapter.pt",
+    encoder_model_name="my-org/my-retriever",
+    embedding_dim=768,
+    query_prefix="query: ",
+    passage_prefix="passage: ",
     device="cpu",
 )
 ```
