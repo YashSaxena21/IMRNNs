@@ -6,14 +6,12 @@ from typing import Any
 
 import torch
 
-from .encoders import normalize_encoder_name
+from .encoders import encoder_storage_key, normalize_encoder_name
 from .model import IMRNN, ModelConfig
 
 
 def default_checkpoint_name(encoder: str, dataset: str) -> str:
-    normalized = normalize_encoder_name(encoder)
-    display = "minilm" if normalized == "mini" else normalized
-    return f"imrnns-{display}-{dataset}.pt"
+    return f"imrnns-{encoder_storage_key(encoder)}-{dataset}.pt"
 
 
 def sanitize_legacy_state_dict(state_dict: dict[str, Any]) -> dict[str, Any]:

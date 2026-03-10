@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional
+import re
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,13 @@ def normalize_encoder_name(name: str) -> str:
         "all-mpnet-base-v2": "mpnet",
     }
     return aliases.get(key, key)
+
+
+def encoder_storage_key(name: str) -> str:
+    normalized = normalize_encoder_name(name)
+    if normalized == "mini":
+        return "minilm"
+    return re.sub(r"[^a-z0-9._-]+", "-", normalized.lower()).strip("-")
 
 
 def get_encoder_spec(name: str) -> EncoderSpec:

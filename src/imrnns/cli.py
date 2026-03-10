@@ -17,7 +17,7 @@ from .beir_data import load_beir_source
 from .caching import build_cache
 from .checkpoints import default_checkpoint_name, load_model, save_checkpoint
 from .data import ContrastiveCachedDataset, load_cached_split
-from .encoders import normalize_encoder_name, resolve_encoder_spec
+from .encoders import encoder_storage_key, normalize_encoder_name, resolve_encoder_spec
 from .evaluation import evaluate_model
 from .model import IMRNN, ModelConfig
 from .training import TrainingConfig, train_model
@@ -25,6 +25,7 @@ from .training import TrainingConfig, train_model
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--assets-root", type=Path, default=default_assets_root())
+    parser.add_argument("--datasets-dir", type=Path)
     parser.add_argument("--encoder")
     parser.add_argument("--encoder-model-name")
     parser.add_argument("--embedding-dim", type=int)
@@ -46,9 +47,8 @@ def _resolve_encoder_spec(args: argparse.Namespace):
 
 def _encoder_label(args: argparse.Namespace, encoder_spec) -> str:
     if args.encoder:
-        normalized = normalize_encoder_name(args.encoder)
-        return "minilm" if normalized == "mini" else normalized
-    return encoder_spec.key.replace("/", "-")
+        return encoder_storage_key(args.encoder)
+    return encoder_storage_key(encoder_spec.key)
 
 
 def _command_list_assets(args: argparse.Namespace) -> int:
@@ -76,7 +76,7 @@ def _load_training_inputs(args: argparse.Namespace):
     encoder_spec = _resolve_encoder_spec(args)
     encoder_label = _encoder_label(args, encoder_spec)
     cache_dir = args.cache_dir or resolve_cache_dir(args.assets_root, encoder_label, args.dataset)
-    datasets_dir = args.assets_root / "datasets"
+    datasets_dir = args.datasets_dir or (args.assets_root / "datasets")
     beir_source = load_beir_source(args.dataset, datasets_dir=datasets_dir, max_queries=args.max_queries)
     train_split = load_cached_split(cache_dir, "train", beir_source, encoder_spec, args.device)
     val_split = load_cached_split(cache_dir, "val", beir_source, encoder_spec, args.device)
@@ -96,7 +96,7 @@ def _command_cache(args: argparse.Namespace) -> int:
         dataset_name=args.dataset,
         encoder_spec=encoder_spec,
         cache_dir=cache_dir,
-        datasets_dir=args.assets_root / "datasets",
+        datasets_dir=args.datasets_dir or (args.assets_root / "datasets"),
         device=args.device,
         batch_size=args.batch_size,
         num_negatives=args.num_negatives,
@@ -194,7 +194,7 @@ def _command_evaluate(args: argparse.Namespace) -> int:
             f"No checkpoint found for encoder='{encoder_label}' dataset='{args.dataset}'. Provide --checkpoint."
         )
 
-    datasets_dir = args.assets_root / "datasets"
+    datasets_dir = args.datasets_dir or (args.assets_root / "datasets")
     beir_source = load_beir_source(args.dataset, datasets_dir=datasets_dir, max_queries=args.max_queries)
     test_split = load_cached_split(cache_dir, "test", beir_source, encoder_spec, args.device)
     model, metadata, missing, unexpected = load_model(

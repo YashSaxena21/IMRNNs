@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .encoders import normalize_encoder_name
+from .encoders import encoder_storage_key, normalize_encoder_name
 
 
 @dataclass(frozen=True)
@@ -43,10 +43,10 @@ def discover_cached_embeddings(assets_root: Path) -> list[AssetMatch]:
             assets.append(AssetMatch(encoder=encoder, dataset=dataset, path=entry))
             continue
 
-        match = re.fullmatch(r"cache_(mini|minilm|e5|mpnet)_(.+)", entry.name)
+        match = re.fullmatch(r"cache_(.+)_(.+)", entry.name)
         if match:
             encoder, dataset = match.groups()
-            encoder = normalize_encoder_name(encoder)
+            encoder = encoder_storage_key(encoder)
             assets.append(AssetMatch(encoder=encoder, dataset=dataset, path=entry))
     return assets
 
@@ -68,34 +68,39 @@ def discover_repo_checkpoints(repo_root: Path) -> list[AssetMatch]:
     if not base_dir.exists():
         return assets
     for entry in sorted(base_dir.rglob("*.pt")):
-        match = re.fullmatch(r"imrnns-(minilm|e5)-(.+)\.pt", entry.name)
-        if not match:
+        encoder = encoder_storage_key(entry.parent.name)
+        prefix = f"imrnns-{entry.parent.name}-"
+        if not entry.name.startswith(prefix) or not entry.name.endswith(".pt"):
             continue
-        encoder, dataset = match.groups()
-        if encoder == "minilm":
-            encoder = "mini"
+        dataset = entry.name.removeprefix(prefix).removesuffix(".pt")
         assets.append(AssetMatch(encoder=encoder, dataset=dataset, path=entry))
     return assets
 
 
 def resolve_cache_dir(assets_root: Path, encoder: str, dataset: str) -> Path:
-    encoder = normalize_encoder_name(encoder)
+    encoder = encoder_storage_key(encoder)
     dataset = dataset.lower()
     for asset in discover_cached_embeddings(assets_root):
         if asset.encoder == encoder and asset.dataset.lower() == dataset:
             return asset.path
+    direct = assets_root / f"cache_{encoder}_{dataset}"
+    if direct.exists():
+        return direct
     raise FileNotFoundError(
         f"No cached embeddings found for encoder='{encoder}' dataset='{dataset}' under {assets_root}"
     )
 
 
 def resolve_checkpoint_path(assets_root: Path, encoder: str, dataset: str) -> Optional[Path]:
-    encoder = normalize_encoder_name(encoder)
+    encoder = encoder_storage_key(encoder)
     dataset = dataset.lower()
     for asset in discover_repo_checkpoints(package_root()):
         if asset.encoder == encoder and asset.dataset.lower() == dataset:
             return asset.path
     for asset in discover_checkpoints(assets_root):
-        if asset.encoder == encoder and asset.dataset.lower() == dataset:
+        if encoder_storage_key(asset.encoder) == encoder and asset.dataset.lower() == dataset:
             return asset.path
+    direct = assets_root / f"imrnns-{encoder}-{dataset}.pt"
+    if direct.exists():
+        return direct
     return None

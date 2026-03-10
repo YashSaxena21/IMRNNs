@@ -7,7 +7,7 @@ from .beir_data import load_beir_source
 from .caching import build_cache
 from .checkpoints import default_checkpoint_name, load_model, save_checkpoint
 from .data import ContrastiveCachedDataset, load_cached_split
-from .encoders import resolve_encoder_spec
+from .encoders import encoder_storage_key, resolve_encoder_spec
 from .evaluation import evaluate_model
 from .model import IMRNN, ModelConfig
 from .training import TrainingConfig, train_model
@@ -124,7 +124,7 @@ def train(
         k_values=[k],
     )
 
-    checkpoint_stem = encoder or encoder_spec.key
+    checkpoint_stem = encoder_storage_key(encoder or encoder_spec.key)
     checkpoint_path = output_dir / default_checkpoint_name(checkpoint_stem, dataset)
     metadata = {
         "encoder": checkpoint_stem,
