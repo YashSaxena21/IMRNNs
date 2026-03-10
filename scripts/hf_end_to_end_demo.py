@@ -5,8 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-from huggingface_hub import hf_hub_download
-
 # Allow the demo to import the local IMRNN package directly from this model repo
 # without requiring a separate editable installation step.
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -14,13 +12,12 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from imrnns.caching import build_cache
+from imrnns import cache_embeddings
 from imrnns.beir_data import load_beir_source
-from imrnns.checkpoints import load_model
 from imrnns.data import load_cached_split
 from imrnns.encoders import get_encoder_spec, normalize_encoder_name
 from imrnns.evaluation import evaluate_model
-from imrnns.model import ModelConfig
+from imrnns.hub import load_pretrained
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,12 +57,7 @@ def main() -> int:
     # Step 1:
     # Download the requested IMRNN checkpoint from the public Hugging Face model repo.
     # By default, the checkpoint path is inferred from the selected encoder and dataset.
-    checkpoint_repo_path = args.checkpoint_path or default_hf_checkpoint_path(args.encoder, args.dataset)
-    checkpoint_local_path = hf_hub_download(
-        repo_id=args.repo_id,
-        filename=checkpoint_repo_path,
-        repo_type="model",
-    )
+    checkpoint_path = args.checkpoint_path or default_hf_checkpoint_path(args.encoder, args.dataset)
 
     # Step 2:
     # Choose where the local BEIR cache should live.
@@ -81,9 +73,9 @@ def main() -> int:
     # If the cache for this encoder/dataset pair does not exist yet, build it from scratch.
     # This uses the matching base retriever to embed the BEIR dataset locally.
     if not (cache_dir / "test" / "embeddings.pt").exists():
-        build_cache(
-            dataset_name=args.dataset,
-            encoder_spec=encoder_spec,
+        cache_embeddings(
+            encoder=args.encoder,
+            dataset=args.dataset,
             cache_dir=cache_dir,
             datasets_dir=datasets_dir,
             device=args.device,
@@ -100,12 +92,14 @@ def main() -> int:
     cached_test = load_cached_split(cache_dir, "test", source, encoder_spec, args.device)
 
     # Step 5:
-    # Load the IMRNN checkpoint on top of the matching base retriever family.
+    # Load the IMRNN checkpoint from the Hugging Face repo on top of the matching base retriever family.
     # The checkpoint contains the learned adapter weights used to modulate query and document
     # embeddings before ranking.
-    model, metadata, missing, unexpected = load_model(
-        checkpoint_path=Path(checkpoint_local_path),
-        model_config=ModelConfig(input_dim=encoder_spec.embedding_dim),
+    model, metadata, _ = load_pretrained(
+        encoder=args.encoder,
+        dataset=args.dataset,
+        repo_id=args.repo_id,
+        checkpoint_filename=checkpoint_path,
         device=args.device,
     )
 
@@ -128,15 +122,13 @@ def main() -> int:
         json.dumps(
             {
                 "repo_id": args.repo_id,
-                "checkpoint": checkpoint_repo_path,
-                "local_checkpoint": checkpoint_local_path,
+                "checkpoint": checkpoint_path,
+                "local_checkpoint": metadata.get("downloaded_checkpoint"),
                 "encoder": args.encoder,
                 "dataset": args.dataset,
                 "cache_dir": str(cache_dir),
                 "metrics": metrics,
                 "metadata": metadata,
-                "missing_keys": missing,
-                "unexpected_keys": unexpected,
             },
             indent=2,
         )

@@ -27,6 +27,7 @@ def main() -> int:
 
     uploads = [
         (repo_root / "huggingface" / "README.md", "README.md"),
+        (repo_root / "huggingface" / "config.json", "config.json"),
         (repo_root / "requirements.txt", "requirements.txt"),
         (repo_root / "pyproject.toml", "pyproject.toml"),
         (repo_root / "scripts" / "minimal_eval.py", "scripts/minimal_eval.py"),

@@ -1,0 +1,18 @@
+{
+  "model_type": "imrnns",
+  "architectures": ["IMRNN"],
+  "library_name": "imrnns",
+  "paper": "https://arxiv.org/abs/2601.20084",
+  "github_repo": "https://github.com/YashSaxena21/IMRNNs",
+  "metrics": ["MRR@10", "Recall@10", "NDCG@10"],
+  "supported_encoders": {
+    "minilm": {
+      "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+      "embedding_dim": 384
+    },
+    "e5": {
+      "base_model": "intfloat/e5-large-v2",
+      "embedding_dim": 1024
+    }
+  }
+}

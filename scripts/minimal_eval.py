@@ -10,12 +10,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from imrnns.beir_data import load_beir_source
-from imrnns.checkpoints import load_model
-from imrnns.data import load_cached_split
-from imrnns.encoders import get_encoder_spec
-from imrnns.evaluation import evaluate_model
-from imrnns.model import ModelConfig
+from imrnns import evaluate
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,34 +28,19 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    encoder_spec = get_encoder_spec(args.encoder)
-    source = load_beir_source(args.dataset, datasets_dir=args.datasets_dir)
-    cached_test = load_cached_split(args.cache_dir, "test", source, encoder_spec, args.device)
-    model, metadata, missing, unexpected = load_model(
+    result = evaluate(
+        encoder=args.encoder,
+        dataset=args.dataset,
+        cache_dir=args.cache_dir,
+        datasets_dir=args.datasets_dir,
         checkpoint_path=args.checkpoint,
-        model_config=ModelConfig(input_dim=encoder_spec.embedding_dim),
-        device=args.device,
-    )
-    metrics = evaluate_model(
-        model=model,
-        cached_split=cached_test,
         device=args.device,
         feedback_k=args.feedback_k,
-        ranking_k=args.k,
-        k_values=[args.k],
+        k=args.k,
     )
-    print(
-        json.dumps(
-            {
-                "checkpoint": str(args.checkpoint),
-                "metrics": metrics,
-                "metadata": metadata,
-                "missing_keys": missing,
-                "unexpected_keys": unexpected,
-            },
-            indent=2,
-        )
-    )
+    payload = dict(result)
+    payload["checkpoint"] = str(payload["checkpoint"])
+    print(json.dumps(payload, indent=2))
     return 0
 
 
