@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 from .data import CachedSplit
-from .model import BiHyperNetIR
+from .model import IMRNN
 
 try:
     import faiss  # type: ignore
@@ -73,7 +73,7 @@ def _compute_metrics(ranked_doc_ids: list[str], qrel: dict[str, int], k_values: 
 
 
 def evaluate_model(
-    model: BiHyperNetIR,
+    model: IMRNN,
     cached_split: CachedSplit,
     device: str,
     feedback_k: int = 100,
@@ -120,10 +120,10 @@ def evaluate_model(
                 dim=0,
             ).to(device)
 
-            _, _, rerank_scores = model.encode_candidates(query_embedding.float().to(device), candidate_embeddings)
-            rerank_scores = rerank_scores.cpu().tolist()
+            _, _, adapted_scores = model.score_candidates(query_embedding.float().to(device), candidate_embeddings)
+            adapted_scores = adapted_scores.cpu().tolist()
             reranked = [
-                doc_id for doc_id, _ in sorted(zip(candidate_ids, rerank_scores), key=lambda item: item[1], reverse=True)
+                doc_id for doc_id, _ in sorted(zip(candidate_ids, adapted_scores), key=lambda item: item[1], reverse=True)
             ][:ranking_k]
 
             metrics = _compute_metrics(reranked, cached_split.split.qrels[qid], k_values)

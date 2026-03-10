@@ -99,7 +99,7 @@ class IMRNN(nn.Module):
         scores = torch.einsum("bd,bkd->bk", F.normalize(modulated_queries, p=2, dim=-1), F.normalize(modulated_documents, p=2, dim=-1))
         return modulated_queries, modulated_documents, scores
 
-    def encode_candidates(
+    def score_candidates(
         self,
         query_embedding: torch.Tensor,
         candidate_document_embeddings: torch.Tensor,
@@ -112,5 +112,5 @@ class IMRNN(nn.Module):
         return modulated_query.squeeze(0), modulated_docs.squeeze(0), scores.squeeze(0)
 
 
-class BiHyperNetIR(IMRNN):
-    """Backward-compatible alias for legacy checkpoints and code paths."""
+BiHyperNetIR = IMRNN
+"""Backward-compatible alias retained for legacy checkpoints and code paths."""

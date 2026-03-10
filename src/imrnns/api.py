@@ -9,7 +9,7 @@ from .checkpoints import default_checkpoint_name, load_model, save_checkpoint
 from .data import ContrastiveCachedDataset, load_cached_split
 from .encoders import get_encoder_spec
 from .evaluation import evaluate_model
-from .model import BiHyperNetIR, ModelConfig
+from .model import IMRNN, ModelConfig
 from .training import TrainingConfig, train_model
 
 
@@ -66,7 +66,7 @@ def train(
     val_split = load_cached_split(cache_dir, "val", beir_source, encoder_spec, device)
     test_split = load_cached_split(cache_dir, "test", beir_source, encoder_spec, device)
 
-    model = BiHyperNetIR(
+    model = IMRNN(
         ModelConfig(
             input_dim=encoder_spec.embedding_dim,
             output_dim=output_dim,

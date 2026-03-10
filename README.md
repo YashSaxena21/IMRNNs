@@ -5,7 +5,7 @@ Installable Python package for **IMRNNs: An Efficient Method for Interpretable D
 Paper:
 - arXiv: https://arxiv.org/abs/2601.20084
 
-IMRNNs is a lightweight adapter for dense retrieval. It sits on top of a base retriever such as MiniLM or E5, projects embeddings into a shared 256-dimensional space, modulates query and document representations, and reranks the top candidates.
+IMRNNs is a lightweight adapter for dense retrieval. It sits on top of a base retriever such as MiniLM or E5, projects embeddings into a shared 256-dimensional space, modulates query and document representations, and adapts retrieval scores over the top candidate set.
 
 This repository provides:
 - BEIR cache construction
@@ -72,7 +72,7 @@ python -m imrnns run \
 ```python
 from pathlib import Path
 
-from imrnns import cache_embeddings, evaluate, load_pretrained, train
+from imrnns import IMRNNAdapter, cache_embeddings, load_pretrained
 
 # Load a released checkpoint from Hugging Face.
 model, metadata, encoder_spec = load_pretrained(
@@ -82,7 +82,23 @@ model, metadata, encoder_spec = load_pretrained(
     device="cpu",
 )
 
-# Train or evaluate locally with the package API.
+# Single-query scoring with the packaged base retriever + IMRNN adapter checkpoint.
+adapter = IMRNNAdapter.from_pretrained(
+    encoder="minilm",
+    dataset="trec-covid",
+    repo_id="yashsaxena21/IMRNNs",
+    device="cpu",
+)
+results = adapter.score(
+    query="What is the incubation period of COVID-19?",
+    documents=[
+        "COVID-19 symptoms can appear 2 to 14 days after exposure.",
+        "The stock market closed higher today.",
+    ],
+    top_k=2,
+)
+
+# Build caches locally for training and evaluation.
 cache_embeddings(
     encoder="minilm",
     dataset="trec-covid",
@@ -101,3 +117,5 @@ Examples:
 - `checkpoints/pretrained/e5/imrnns-e5-fiqa.pt`
 
 For the public checkpoint release and Hub demo, see the Hugging Face model page.
+
+Legacy note: `BiHyperNetIR` is kept only as an internal compatibility alias for older checkpoint code paths. The public architecture name is `IMRNN`.

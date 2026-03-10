@@ -7,7 +7,7 @@ from typing import Any
 import torch
 
 from .encoders import normalize_encoder_name
-from .model import BiHyperNetIR, ModelConfig
+from .model import IMRNN, ModelConfig
 
 
 def default_checkpoint_name(encoder: str, dataset: str) -> str:
@@ -29,7 +29,7 @@ def sanitize_legacy_state_dict(state_dict: dict[str, Any]) -> dict[str, Any]:
 
 def save_checkpoint(
     path: Path,
-    model: BiHyperNetIR,
+    model: IMRNN,
     metadata: dict[str, Any],
 ) -> None:
     payload = {
@@ -56,9 +56,9 @@ def load_model(
     checkpoint_path: Path,
     model_config: ModelConfig,
     device: str,
-) -> tuple[BiHyperNetIR, dict[str, Any], list[str], list[str]]:
+) -> tuple[IMRNN, dict[str, Any], list[str], list[str]]:
     state_dict, metadata = load_checkpoint(checkpoint_path)
-    model = BiHyperNetIR(model_config)
+    model = IMRNN(model_config)
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
     model.to(device)
     model.eval()

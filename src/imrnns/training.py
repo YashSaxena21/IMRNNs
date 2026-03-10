@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .data import ContrastiveCachedDataset, collate_contrastive_batch
-from .model import BiHyperNetIR
+from .model import IMRNN
 
 
 class MultipleNegativesRankingLoss(torch.nn.Module):
@@ -45,7 +45,7 @@ def build_dataloader(dataset: ContrastiveCachedDataset, batch_size: int, shuffle
 
 
 def evaluate_loss(
-    model: BiHyperNetIR,
+    model: IMRNN,
     dataloader: DataLoader,
     device: str,
     loss_fn: MultipleNegativesRankingLoss,
@@ -67,7 +67,7 @@ def evaluate_loss(
 
 
 def train_model(
-    model: BiHyperNetIR,
+    model: IMRNN,
     train_dataset: ContrastiveCachedDataset,
     val_dataset: ContrastiveCachedDataset,
     config: TrainingConfig,

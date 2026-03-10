@@ -9,7 +9,7 @@ from huggingface_hub import HfApi, hf_hub_download
 
 from .checkpoints import default_checkpoint_name, load_model
 from .encoders import EncoderSpec, get_encoder_spec, normalize_encoder_name
-from .model import BiHyperNetIR, ModelConfig
+from .model import IMRNN, ModelConfig
 
 DEFAULT_REPO_ID = "yashsaxena21/IMRNNs"
 CONFIG_FILENAME = "config.json"
@@ -92,7 +92,7 @@ def load_pretrained(
     revision: Optional[str] = None,
     cache_dir: Optional[Path] = None,
     local_files_only: bool = False,
-) -> tuple[BiHyperNetIR, dict[str, Any], EncoderSpec]:
+) -> tuple[IMRNN, dict[str, Any], EncoderSpec]:
     encoder_spec = get_encoder_spec(encoder)
     pretrained = download_checkpoint(
         encoder=encoder,

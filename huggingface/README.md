@@ -16,7 +16,7 @@ Adapter-only IMRNN checkpoints for the paper **IMRNNs: An Efficient Method for I
 Paper:
 - arXiv: https://arxiv.org/abs/2601.20084
 
-IMRNNs is trained on top of a base dense retriever such as MiniLM or E5. The checkpoint projects the original embedding space into a shared 256-dimensional adapter space, applies bidirectional modulation, and reranks the top candidates.
+IMRNNs is trained on top of a base dense retriever such as MiniLM or E5. The checkpoint projects the original embedding space into a shared 256-dimensional adapter space, applies bidirectional modulation, and adapts retrieval scores over the top candidate set.
 
 This model repo is the public checkpoint release for the `imrnns` Python package. It includes:
 - adapter-only checkpoints
@@ -30,7 +30,33 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-## End-to-End Python Demo
+## Quick Adapter Demo
+
+```python
+from imrnns import IMRNNAdapter
+
+adapter = IMRNNAdapter.from_pretrained(
+    encoder="minilm",
+    dataset="trec-covid",
+    repo_id="yashsaxena21/IMRNNs",
+    device="cpu",
+)
+
+results = adapter.score(
+    query="What is the incubation period of COVID-19?",
+    documents=[
+        "COVID-19 symptoms can appear 2 to 14 days after exposure.",
+        "The stock market closed higher today.",
+        "Transmission risk depends on exposure setting and viral load.",
+    ],
+    top_k=3,
+)
+
+for item in results:
+    print(item.rank, item.score, item.text)
+```
+
+## End-to-End Evaluation Demo
 
 ```python
 from pathlib import Path
