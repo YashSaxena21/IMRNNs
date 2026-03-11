@@ -1,18 +1,48 @@
 # IMRNNs
 
-Installable Python package for **IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation**.
+<p align="center">
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/imrnns-given-wordmark-header.png" alt="IMRNNs" width="520" />
+</p>
 
-Paper:
-- arXiv: https://arxiv.org/abs/2601.20084
+<p align="center">
+  <strong>Interpretable Modular Retrieval Neural Networks (IMRNNs)</strong>
+  <br />
+  Official implementation for training, evaluation, and released adapter checkpoints
+</p>
 
-IMRNNs is a lightweight adapter for dense retrieval. It sits on top of a base retriever such as MiniLM or E5, projects embeddings into a shared 256-dimensional space, modulates query and document representations, and adapts retrieval scores over the top candidate set.
+<p align="center">
+  <a href="https://yashsaxena21.github.io/IMRNNs-web/">Website</a> ·
+  <a href="https://arxiv.org/abs/2601.20084">Paper</a> ·
+  <a href="https://huggingface.co/yashsaxena21/IMRNNs">Hugging Face</a>
+</p>
 
-This repository provides:
-- BEIR cache construction
-- IMRNN training
-- checkpoint evaluation with `MRR@10`, `Recall@10`, and `NDCG@10`
-- pretrained adapter-only checkpoints
-- Hugging Face loading helpers
+<p align="center">
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/imrnns-given-icon-tight.png" alt="IMRNNs mark" height="54" />
+  &nbsp;&nbsp;
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/umbc-shield.png" alt="UMBC" height="54" />
+  &nbsp;&nbsp;
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/kai2-logo.jpg" alt="KAI2 Lab" height="54" />
+  &nbsp;&nbsp;
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/hf-logo.svg" alt="Hugging Face" height="54" />
+  &nbsp;&nbsp;
+  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="54" />
+</p>
+
+IMRNNs is a dense retriever adapter that keeps the base encoder frozen and learns two lightweight MLP modules in embedding space: one modulates document embeddings using the query, and one refines the query using retrieved documents. The repository provides the full package implementation, CLI workflows, baseline code, and released adapter-only checkpoints.
+
+## Project Links
+
+- Website: `https://yashsaxena21.github.io/IMRNNs-web/`
+- Paper: `https://arxiv.org/abs/2601.20084`
+- Hugging Face release: `https://huggingface.co/yashsaxena21/IMRNNs`
+
+## What This Repository Includes
+
+- `imrnns` Python package under `src/imrnns`
+- End-to-end CLI for cache construction, training, evaluation, and full runs
+- Adapter-only pretrained checkpoints under `checkpoints/pretrained`
+- Baseline scripts under `baseline`
+- Minimal evaluation and Hub demo scripts under `scripts`
 
 ## Install
 
@@ -24,38 +54,86 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-## CLI
+## Quick Start
 
-Build caches:
+Load a released adapter on top of the matching base retriever:
 
-```bash
-python -m imrnns cache --encoder minilm --dataset trec-covid --device cpu
+```python
+from imrnns import IMRNNAdapter
+
+adapter = IMRNNAdapter.from_pretrained(
+    encoder="minilm",
+    dataset="webis-touche2020",
+    repo_id="yashsaxena21/IMRNNs",
+    device="cpu",
+)
+
+results = adapter.score(
+    query="Should social media platforms ban political advertising?",
+    documents=[
+        "Restricting political ads can reduce targeted misinformation.",
+        "A recipe for roasted cauliflower with tahini sauce.",
+        "Ad transparency archives improve auditing of campaign messaging.",
+    ],
+    top_k=3,
+)
+
+for item in results:
+    print(item.rank, item.score, item.text)
 ```
 
-Train:
+## CLI Workflow
+
+Build a BEIR cache:
+
+```bash
+python -m imrnns cache \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --output-dir /path/to/cache_minilm_webis-touche2020
+```
+
+Train IMRNNs:
 
 ```bash
 python -m imrnns train \
   --encoder minilm \
-  --dataset trec-covid \
-  --device cpu \
-  --epochs 5 \
-  --batch-size 8 \
+  --dataset webis-touche2020 \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --output-dir /path/to/artifacts \
   --k 10
 ```
 
-Evaluate:
+Evaluate a checkpoint:
 
 ```bash
 python -m imrnns evaluate \
   --encoder minilm \
-  --dataset trec-covid \
+  --dataset webis-touche2020 \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --checkpoint checkpoints/pretrained/minilm/imrnns-minilm-webis-touche2020.pt \
   --device cpu \
-  --checkpoint checkpoints/pretrained/minilm/imrnns-minilm-trec-covid.pt \
   --k 10
 ```
 
-Evaluate a custom retriever + custom IMRNN checkpoint:
+Run the end-to-end flow:
+
+```bash
+python -m imrnns run \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --output-dir /path/to/artifacts \
+  --device cpu \
+  --k 10
+```
+
+## Custom Retriever Support
+
+IMRNNs can also be trained or evaluated on top of a custom dense retriever by specifying the base model name, embedding size, and optional query or passage prefixes.
 
 ```bash
 python -m imrnns evaluate \
@@ -64,67 +142,19 @@ python -m imrnns evaluate \
   --query-prefix "query: " \
   --passage-prefix "passage: " \
   --dataset my-dataset \
-  --cache-dir /path/to/my_cache \
+  --cache-dir /path/to/cache_my_retriever \
   --datasets-dir /path/to/datasets \
   --checkpoint /path/to/my_imrnn_adapter.pt \
   --device cpu \
   --k 10
 ```
 
-Run the full pipeline:
-
-```bash
-python -m imrnns run \
-  --encoder minilm \
-  --dataset trec-covid \
-  --device cpu \
-  --epochs 5 \
-  --batch-size 8 \
-  --k 10
-```
-
-## Python API
+The same path is available through the Python API:
 
 ```python
-from pathlib import Path
+from imrnns import IMRNNAdapter
 
-from imrnns import IMRNNAdapter, cache_embeddings, load_pretrained
-
-# Load a released checkpoint from Hugging Face.
-model, metadata, encoder_spec = load_pretrained(
-    encoder="minilm",
-    dataset="trec-covid",
-    repo_id="yashsaxena21/IMRNNs",
-    device="cpu",
-)
-
-# Single-query scoring with the packaged base retriever + IMRNN adapter checkpoint.
-adapter = IMRNNAdapter.from_pretrained(
-    encoder="minilm",
-    dataset="trec-covid",
-    repo_id="yashsaxena21/IMRNNs",
-    device="cpu",
-)
-results = adapter.score(
-    query="What is the incubation period of COVID-19?",
-    documents=[
-        "COVID-19 symptoms can appear 2 to 14 days after exposure.",
-        "The stock market closed higher today.",
-    ],
-    top_k=2,
-)
-
-# Build caches locally for training and evaluation.
-cache_embeddings(
-    encoder="minilm",
-    dataset="trec-covid",
-    cache_dir=Path("cache_minilm_trec-covid"),
-    datasets_dir=Path("datasets"),
-    device="cpu",
-)
-
-# Custom retriever + custom IMRNN checkpoint.
-custom_adapter = IMRNNAdapter.from_checkpoint(
+adapter = IMRNNAdapter.from_checkpoint(
     checkpoint_path="my_imrnn_adapter.pt",
     encoder_model_name="my-org/my-retriever",
     embedding_dim=768,
@@ -134,14 +164,32 @@ custom_adapter = IMRNNAdapter.from_checkpoint(
 )
 ```
 
-## Checkpoints
+## Released Checkpoints
 
-Released checkpoints are stored in adapter-only format. They contain the learned IMRNN projection and hypernetwork weights, while the base retriever is loaded separately by name.
+Released checkpoints are adapter-only. The base retriever is loaded separately by name, and the checkpoint contains the learned IMRNN projection and adapter weights.
 
 Examples:
+
+- `checkpoints/pretrained/minilm/imrnns-minilm-webis-touche2020.pt`
 - `checkpoints/pretrained/minilm/imrnns-minilm-trec-covid.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-fiqa.pt`
+- `checkpoints/pretrained/e5/imrnns-e5-nq.pt`
+- `checkpoints/pretrained/e5/imrnns-e5-webis-touche2020.pt`
 
-For the public checkpoint release and Hub demo, see the Hugging Face model page.
+For the public checkpoint release and model card, see Hugging Face:
 
-Legacy note: `BiHyperNetIR` is kept only as an internal compatibility alias for older checkpoint code paths. The public architecture name is `IMRNN`.
+- `https://huggingface.co/yashsaxena21/IMRNNs`
+
+## Citation
+
+```bibtex
+@misc{saxena2026imrnns,
+  title={IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation},
+  author={Yash Saxena and Ankur Padia and Kalpa Gunaratna and Manas Gaur},
+  year={2026},
+  eprint={2601.20084},
+  archivePrefix={arXiv},
+  note={Accepted to EACL 2026}
+}
+```
+
+Legacy note: `BiHyperNetIR` remains only as an internal compatibility alias for older checkpoints and code paths. The public architecture name is `IMRNN`.
