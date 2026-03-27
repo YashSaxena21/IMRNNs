@@ -44,7 +44,7 @@ The released checkpoints are dataset-specific. They are not zero-shot checkpoint
 
 Examples:
 
-- `imrnns-minilm-webis-touche2020.pt` is trained for `webis-touche2020`
+- `imrnns-minilm-trec-covid.pt` is trained for `trec-covid`
 - `imrnns-e5-nq.pt` is trained for `nq`
 
 If you want to train IMRNNs on another dataset or on another retriever, use the full GitHub implementation:
@@ -66,16 +66,16 @@ The full data-preparation flow lives in the GitHub repository. The package downl
 
 Example:
 
-- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/webis-touche2020.zip`
+- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/trec-covid.zip`
 
 To build the cache for a dataset and retriever:
 
 ```bash
 python -m imrnns cache \
   --encoder minilm \
-  --dataset webis-touche2020 \
+  --dataset trec-covid \
   --datasets-dir /path/to/datasets \
-  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --cache-dir /path/to/cache_minilm_trec-covid \
   --device cpu
 ```
 
@@ -90,17 +90,17 @@ from imrnns import IMRNNAdapter
 
 adapter = IMRNNAdapter.from_pretrained(
     encoder="minilm",
-    dataset="webis-touche2020",
+    dataset="trec-covid",
     repo_id="yashsaxena21/IMRNNs",
     device="cpu",
 )
 
 scores = adapter.score(
-    query="Should social media platforms ban political advertising?",
+    query="What is the incubation period of COVID-19?",
     documents=[
-        "Restricting political ads can reduce targeted misinformation.",
-        "A recipe for roasted cauliflower with tahini sauce.",
-        "Ad transparency archives improve auditing of campaign messaging.",
+        "COVID-19 symptoms can appear 2 to 14 days after exposure.",
+        "The stock market closed higher today.",
+        "Transmission risk depends on exposure setting and viral load.",
     ],
     top_k=3,
 )
@@ -120,7 +120,7 @@ from imrnns.data import load_cached_split
 from imrnns.evaluation import evaluate_model
 
 encoder = "minilm"
-dataset = "webis-touche2020"
+dataset = "trec-covid"
 repo_id = "yashsaxena21/IMRNNs"
 device = "cpu"
 k = 10
@@ -132,7 +132,7 @@ model, metadata, encoder_spec = load_pretrained(
     device=device,
 )
 
-cache_dir = Path("demo_cache") / "cache_minilm_webis-touche2020"
+cache_dir = Path("demo_cache") / "cache_minilm_trec-covid"
 datasets_dir = Path("datasets")
 
 if not (cache_dir / "test" / "embeddings.pt").exists():
