@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://yashsaxena21.github.io/IMRNNs-web/">Website</a> ·
-  <a href="https://arxiv.org/abs/2601.20084">Paper</a> ·
+  <a href="https://aclanthology.org/2026.findings-eacl.333/">EACL 2026 Paper</a> ·
   <a href="https://huggingface.co/yashsaxena21/IMRNNs">Hugging Face</a>
 </p>
 
@@ -28,21 +28,38 @@
   <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="54" />
 </p>
 
-IMRNNs is a dense retriever adapter that keeps the base encoder frozen and learns two lightweight MLP modules in embedding space: one modulates document embeddings using the query, and one refines the query using retrieved documents. The repository provides the full package implementation, CLI workflows, baseline code, and released adapter-only checkpoints.
+IMRNNs keeps the base dense retriever frozen and learns two lightweight MLP adapters directly in embedding space:
+
+- the query adapter modulates document embeddings using the current query
+- the document adapter refines the query using initially retrieved documents
+
+This repository contains the installable `imrnns` package, the CLI for data preparation, training, and evaluation, baseline code, and released adapter-only checkpoints.
 
 ## Project Links
 
 - Website: `https://yashsaxena21.github.io/IMRNNs-web/`
-- Paper: `https://arxiv.org/abs/2601.20084`
-- Hugging Face release: `https://huggingface.co/yashsaxena21/IMRNNs`
+- Published paper: `https://aclanthology.org/2026.findings-eacl.333/`
+- Hugging Face checkpoints: `https://huggingface.co/yashsaxena21/IMRNNs`
 
 ## What This Repository Includes
 
-- `imrnns` Python package under `src/imrnns`
-- End-to-end CLI for cache construction, training, evaluation, and full runs
-- Adapter-only pretrained checkpoints under `checkpoints/pretrained`
-- Baseline scripts under `baseline`
-- Minimal evaluation and Hub demo scripts under `scripts`
+- `src/imrnns`: package implementation
+- `checkpoints/pretrained`: released adapter-only checkpoints
+- `scripts`: minimal evaluation and Hub demos
+- `baseline`: baseline research scripts kept alongside the package implementation
+
+## Training and Evaluation Protocol
+
+This point is easy to miss, so it is explicit here:
+
+- The released checkpoints are dataset-specific adapters.
+- They are not zero-shot checkpoints evaluated unchanged across all of BEIR.
+- Each checkpoint name tells you the training dataset, for example `imrnns-minilm-webis-touche2020.pt` or `imrnns-e5-nq.pt`.
+- The current package workflow downloads the selected BEIR dataset, loads its source split, and derives `train`, `val`, and `test` query splits from that dataset before training.
+- For most datasets, the source split is BEIR `test`.
+- For `msmarco`, the package uses BEIR `train` as the source split because the BEIR test setup differs there.
+
+In other words, if you train with `--dataset webis-touche2020`, the adapter is trained and evaluated on splits derived from the `webis-touche2020` BEIR dataset.
 
 ## Install
 
@@ -54,7 +71,112 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-## Quick Start
+## Step-by-Step: Data, Embeddings, Training, Evaluation
+
+### 1. Choose a BEIR dataset
+
+The package uses the official BEIR dataset archives hosted by the BEIR project:
+
+- base URL pattern: `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/<dataset>.zip`
+- example: `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/webis-touche2020.zip`
+
+You have two options:
+
+1. Let IMRNNs download the dataset automatically when you run `cache`.
+2. Download the zip yourself from the BEIR URL above and unpack it into your `datasets` directory.
+
+Expected layout after download:
+
+```text
+datasets/
+└── webis-touche2020/
+```
+
+### 2. Build the embedding cache
+
+This step downloads the base retriever, encodes the corpus and queries, creates BEIR-derived `train`, `val`, and `test` splits, and mines BM25 negatives for training.
+
+```bash
+python -m imrnns cache \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --device cpu
+```
+
+What gets written:
+
+```text
+cache_minilm_webis-touche2020/
+├── manifest.json
+├── train/
+│   ├── embeddings.pt
+│   ├── query_embeddings_mini.pt
+│   └── negatives.json
+├── val/
+│   ├── embeddings.pt
+│   ├── query_embeddings_mini.pt
+│   └── negatives.json
+└── test/
+    ├── embeddings.pt
+    ├── query_embeddings_mini.pt
+    └── negatives.json
+```
+
+For E5, the query file is `query_embeddings_e5.pt`. The document embeddings remain in `embeddings.pt`.
+
+### 3. Train IMRNNs
+
+```bash
+python -m imrnns train \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --output-dir /path/to/artifacts \
+  --device cpu \
+  --k 10
+```
+
+This writes a checkpoint such as:
+
+```text
+artifacts/imrnns-minilm-webis-touche2020.pt
+```
+
+### 4. Evaluate a checkpoint
+
+```bash
+python -m imrnns evaluate \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --checkpoint /path/to/artifacts/imrnns-minilm-webis-touche2020.pt \
+  --device cpu \
+  --k 10
+```
+
+Reported metrics:
+
+- `MRR@10`
+- `Recall@10`
+- `NDCG@10`
+
+### 5. Run the full pipeline in one command
+
+```bash
+python -m imrnns run \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --output-dir /path/to/artifacts \
+  --device cpu \
+  --k 10
+```
+
+## Quick Start with Released Checkpoints
 
 Load a released adapter on top of the matching base retriever:
 
@@ -82,58 +204,9 @@ for item in results:
     print(item.rank, item.score, item.text)
 ```
 
-## CLI Workflow
-
-Build a BEIR cache:
-
-```bash
-python -m imrnns cache \
-  --encoder minilm \
-  --dataset webis-touche2020 \
-  --datasets-dir /path/to/datasets \
-  --output-dir /path/to/cache_minilm_webis-touche2020
-```
-
-Train IMRNNs:
-
-```bash
-python -m imrnns train \
-  --encoder minilm \
-  --dataset webis-touche2020 \
-  --cache-dir /path/to/cache_minilm_webis-touche2020 \
-  --datasets-dir /path/to/datasets \
-  --output-dir /path/to/artifacts \
-  --k 10
-```
-
-Evaluate a checkpoint:
-
-```bash
-python -m imrnns evaluate \
-  --encoder minilm \
-  --dataset webis-touche2020 \
-  --cache-dir /path/to/cache_minilm_webis-touche2020 \
-  --datasets-dir /path/to/datasets \
-  --checkpoint checkpoints/pretrained/minilm/imrnns-minilm-webis-touche2020.pt \
-  --device cpu \
-  --k 10
-```
-
-Run the end-to-end flow:
-
-```bash
-python -m imrnns run \
-  --encoder minilm \
-  --dataset webis-touche2020 \
-  --datasets-dir /path/to/datasets \
-  --output-dir /path/to/artifacts \
-  --device cpu \
-  --k 10
-```
-
 ## Custom Retriever Support
 
-IMRNNs can also be trained or evaluated on top of a custom dense retriever by specifying the base model name, embedding size, and optional query or passage prefixes.
+If you trained IMRNNs on your own dense retriever, provide the base model name, embedding size, and optional query or passage prefixes explicitly:
 
 ```bash
 python -m imrnns evaluate \
@@ -149,7 +222,7 @@ python -m imrnns evaluate \
   --k 10
 ```
 
-The same path is available through the Python API:
+Equivalent Python API:
 
 ```python
 from imrnns import IMRNNAdapter
@@ -175,20 +248,27 @@ Examples:
 - `checkpoints/pretrained/e5/imrnns-e5-nq.pt`
 - `checkpoints/pretrained/e5/imrnns-e5-webis-touche2020.pt`
 
-For the public checkpoint release and model card, see Hugging Face:
+For the public checkpoint release and model card, see:
 
 - `https://huggingface.co/yashsaxena21/IMRNNs`
 
 ## Citation
 
 ```bibtex
-@misc{saxena2026imrnns,
-  title={IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation},
-  author={Yash Saxena and Ankur Padia and Kalpa Gunaratna and Manas Gaur},
-  year={2026},
-  eprint={2601.20084},
-  archivePrefix={arXiv},
-  note={Accepted to EACL 2026}
+@inproceedings{saxena-etal-2026-imrnns,
+  title = "{IMRNN}s: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation",
+  author = "Saxena, Yash and
+    Padia, Ankur and
+    Gunaratna, Kalpa and
+    Gaur, Manas",
+  booktitle = "Findings of the Association for Computational Linguistics: EACL 2026",
+  month = mar,
+  year = "2026",
+  address = "Rabat, Morocco",
+  publisher = "Association for Computational Linguistics",
+  url = "https://aclanthology.org/2026.findings-eacl.333/",
+  doi = "10.18653/v1/2026.findings-eacl.333",
+  pages = "6324--6337"
 }
 ```
 

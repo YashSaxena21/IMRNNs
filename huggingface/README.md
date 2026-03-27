@@ -25,7 +25,7 @@ license: mit
 <p align="center">
   <a href="https://yashsaxena21.github.io/IMRNNs-web/">Website</a> ·
   <a href="https://github.com/YashSaxena21/IMRNNs">GitHub</a> ·
-  <a href="https://arxiv.org/abs/2601.20084">Paper</a>
+  <a href="https://aclanthology.org/2026.findings-eacl.333/">EACL 2026 Paper</a>
 </p>
 
 <p align="center">
@@ -36,15 +36,18 @@ license: mit
   <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="54" />
 </p>
 
-This repository is the public checkpoint release for the `imrnns` Python package. IMRNNs keeps the base dense retriever frozen and learns lightweight embedding-space adapters on top of it: one modulates documents using the query, and one refines the query using retrieved documents.
+This repository hosts the released IMRNN checkpoints. Each checkpoint is adapter-only, and the corresponding base dense retriever is loaded separately by the `imrnns` package.
 
-## What Is Released Here
+## Important Training Note
 
-- Adapter-only IMRNN checkpoints
-- The `imrnns` package source needed to load them
-- Minimal evaluation and end-to-end demo scripts
+The released checkpoints are dataset-specific. They are not zero-shot checkpoints evaluated unchanged across all of BEIR.
 
-For full training and cache-building workflows, use the main GitHub repository:
+Examples:
+
+- `imrnns-minilm-webis-touche2020.pt` is trained for `webis-touche2020`
+- `imrnns-e5-nq.pt` is trained for `nq`
+
+If you want to train IMRNNs on another dataset or on another retriever, use the full GitHub implementation:
 
 - `https://github.com/YashSaxena21/IMRNNs`
 
@@ -55,9 +58,32 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+## How to Get the Dataset and Embeddings
+
+The full data-preparation flow lives in the GitHub repository. The package downloads official BEIR datasets from:
+
+- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/<dataset>.zip`
+
+Example:
+
+- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/webis-touche2020.zip`
+
+To build the cache for a dataset and retriever:
+
+```bash
+python -m imrnns cache \
+  --encoder minilm \
+  --dataset webis-touche2020 \
+  --datasets-dir /path/to/datasets \
+  --cache-dir /path/to/cache_minilm_webis-touche2020 \
+  --device cpu
+```
+
+That command downloads the dataset if needed, embeds the corpus and queries, and writes the training files required by IMRNNs.
+
 ## Quick Start
 
-Load the matching base retriever first, then apply the IMRNN adapter checkpoint:
+Load the matching base retriever and the released IMRNN adapter checkpoint:
 
 ```python
 from imrnns import IMRNNAdapter
@@ -82,8 +108,6 @@ scores = adapter.score(
 for item in scores:
     print(item.rank, item.score, item.text)
 ```
-
-`IMRNNAdapter.from_pretrained(...)` loads the corresponding base retriever and then applies the released IMRNN adapter on top of it.
 
 ## End-to-End Evaluation
 
@@ -157,10 +181,6 @@ adapter = IMRNNAdapter.from_checkpoint(
 )
 ```
 
-For training IMRNNs on additional retrievers or datasets, use the full GitHub implementation:
-
-- `https://github.com/YashSaxena21/IMRNNs`
-
 ## Released Checkpoints
 
 MiniLM:
@@ -185,12 +205,19 @@ E5:
 ## Citation
 
 ```bibtex
-@misc{saxena2026imrnns,
-  title={IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation},
-  author={Yash Saxena and Ankur Padia and Kalpa Gunaratna and Manas Gaur},
-  year={2026},
-  eprint={2601.20084},
-  archivePrefix={arXiv},
-  note={Accepted to EACL 2026}
+@inproceedings{saxena-etal-2026-imrnns,
+  title = "{IMRNN}s: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation",
+  author = "Saxena, Yash and
+    Padia, Ankur and
+    Gunaratna, Kalpa and
+    Gaur, Manas",
+  booktitle = "Findings of the Association for Computational Linguistics: EACL 2026",
+  month = mar,
+  year = "2026",
+  address = "Rabat, Morocco",
+  publisher = "Association for Computational Linguistics",
+  url = "https://aclanthology.org/2026.findings-eacl.333/",
+  doi = "10.18653/v1/2026.findings-eacl.333",
+  pages = "6324--6337"
 }
 ```
