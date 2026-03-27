@@ -256,19 +256,24 @@ For the public checkpoint release and model card, see:
 
 ```bibtex
 @inproceedings{saxena-etal-2026-imrnns,
-  title = "{IMRNN}s: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation",
-  author = "Saxena, Yash and
-    Padia, Ankur and
-    Gunaratna, Kalpa and
-    Gaur, Manas",
-  booktitle = "Findings of the Association for Computational Linguistics: EACL 2026",
-  month = mar,
-  year = "2026",
-  address = "Rabat, Morocco",
-  publisher = "Association for Computational Linguistics",
-  url = "https://aclanthology.org/2026.findings-eacl.333/",
-  doi = "10.18653/v1/2026.findings-eacl.333",
-  pages = "6324--6337"
+    title = "{IMRNN}s: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation",
+    author = "Saxena, Yash  and
+      Padia, Ankur  and
+      Gunaratna, Kalpa  and
+      Gaur, Manas",
+    editor = "Demberg, Vera  and
+      Inui, Kentaro  and
+      Marquez, Llu{\'i}s",
+    booktitle = "Findings of the {A}ssociation for {C}omputational {L}inguistics: {EACL} 2026",
+    month = mar,
+    year = "2026",
+    address = "Rabat, Morocco",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.findings-eacl.333/",
+    doi = "10.18653/v1/2026.findings-eacl.333",
+    pages = "6324--6337",
+    ISBN = "979-8-89176-386-9",
+    abstract = "Interpretability in black-box dense retrievers remains a central challenge in Retrieval-Augmented Generation (RAG). Understanding how queries and documents semantically interact is critical for diagnosing retrieval behavior and improving model design. However, existing dense retrievers rely on static embeddings for both queries and documents, which obscures this bidirectional relationship. Post-hoc approaches such as re-rankers are computationally expensive, add inference latency, and still fail to reveal the underlying semantic alignment. To address these limitations, we propose Interpretable Modular Retrieval Neural Networks (IMRNNs), a lightweight framework that augments any dense retriever with dynamic, bidirectional modulation at inference time. IMRNNs employ two independent adapters: one conditions document embeddings on the current query, while the other refines the query embedding using corpus-level feedback from initially retrieved documents. This iterative modulation process enables the model to adapt representations dynamically and expose interpretable semantic dependencies between queries and documents. Empirically, IMRNNs not only enhance interpretability but also improve retrieval effectiveness. Across seven benchmark datasets, applying our method to standard dense retrievers yields average gains of +6.35{\%} nDCG, +7.14{\%} recall, and +7.04{\%} MRR over state-of-the-art baselines. These results demonstrate that incorporating interpretability-driven modulation can both explain and enhance retrieval in RAG systems."
 }
 ```
 
