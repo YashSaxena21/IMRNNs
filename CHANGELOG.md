@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.3 — 2026-08-17
+
+- Rebuilt the GitHub and PyPI documentation as an end-to-end guide for new and
+  experienced users.
+- Replaced illustrative snippets with one consistent, reproducible SciFact
+  example across ranking and explanation workflows.
+- Added repository-hosted project and organization artwork that remains legible
+  on both light and dark backgrounds.
+- Updated the Hugging Face model card and publishing workflow to keep its
+  documentation, package source, assets, and checkpoint synchronized.
+
 ## 0.2.2 — 2026-08-16
 
 - Corrected the public terminology to describe IMRNNs as a dense-retrieval

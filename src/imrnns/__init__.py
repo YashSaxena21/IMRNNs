@@ -1,6 +1,6 @@
 """IMRNNs package."""
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 from .adapter import IMRNNAdapter, RetrievalResult
 from .api import cache_embeddings, evaluate, run, train
