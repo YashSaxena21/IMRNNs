@@ -1,0 +1,11 @@
+include CHANGELOG.md
+include CITATION.cff
+include ATTRIBUTION.md
+include LICENSE
+include TRAINING_STUDY.md
+include requirements.txt
+recursive-include checkpoints/validated *.pt
+recursive-include examples *.py
+recursive-include huggingface *.json *.md
+recursive-include scripts *.py
+recursive-include tests *.py

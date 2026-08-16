@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use IMRNNs, please cite the EACL 2026 paper."
+title: "IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation"
+type: software
+version: 0.2.0
+date-released: 2026-08-16
+license: CC-BY-4.0
+repository-code: "https://github.com/YashSaxena21/IMRNNs"
+url: "https://yashsaxena21.github.io/IMRNNs-web/"
+authors:
+  - family-names: Saxena
+    given-names: Yash
+  - family-names: Padia
+    given-names: Ankur
+  - family-names: Gunaratna
+    given-names: Kalpa
+  - family-names: Gaur
+    given-names: Manas
+preferred-citation:
+  type: conference-paper
+  title: "IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation"
+  authors:
+    - family-names: Saxena
+      given-names: Yash
+    - family-names: Padia
+      given-names: Ankur
+    - family-names: Gunaratna
+      given-names: Kalpa
+    - family-names: Gaur
+      given-names: Manas
+  collection-title: "Findings of the Association for Computational Linguistics: EACL 2026"
+  publisher:
+    name: Association for Computational Linguistics
+  year: 2026
+  month: 3
+  start: 6324
+  end: 6337
+  doi: "10.18653/v1/2026.findings-eacl.333"
+  url: "https://aclanthology.org/2026.findings-eacl.333/"

@@ -28,10 +28,13 @@ def main() -> int:
     uploads = [
         (repo_root / "huggingface" / "README.md", "README.md"),
         (repo_root / "huggingface" / "config.json", "config.json"),
+        (repo_root / "LICENSE", "LICENSE"),
+        (repo_root / "ATTRIBUTION.md", "ATTRIBUTION.md"),
+        (repo_root / "CITATION.cff", "CITATION.cff"),
         (repo_root / "requirements.txt", "requirements.txt"),
         (repo_root / "pyproject.toml", "pyproject.toml"),
+        (repo_root / "TRAINING_STUDY.md", "TRAINING_STUDY.md"),
         (repo_root / "scripts" / "minimal_eval.py", "scripts/minimal_eval.py"),
-        (repo_root / "scripts" / "hf_end_to_end_demo.py", "scripts/hf_end_to_end_demo.py"),
     ]
 
     for local_path, remote_path in uploads:
@@ -43,8 +46,8 @@ def main() -> int:
         )
 
     api.upload_folder(
-        folder_path=str(repo_root / "checkpoints" / "pretrained"),
-        path_in_repo="checkpoints/pretrained",
+        folder_path=str(repo_root / "checkpoints" / "validated"),
+        path_in_repo="checkpoints/validated",
         repo_id=args.repo_id,
         repo_type="model",
     )

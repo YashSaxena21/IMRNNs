@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .encoders import encoder_storage_key, normalize_encoder_name
+from .encoders import encoder_storage_key
 
 
 @dataclass(frozen=True)
@@ -15,16 +16,9 @@ class AssetMatch:
     path: Path
 
 
-SPECIAL_CACHE_DIRS = {
-    "mini_fiqa": ("mini", "fiqa"),
-    "cache_e5": ("e5", "msmarco"),
-    "cache_fresh_run": ("mini", "msmarco"),
-    "cache_mpnet": ("mpnet", "msmarco"),
-}
-
-
 def default_assets_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    configured = os.environ.get("IMRNNS_HOME")
+    return Path(configured).expanduser() if configured else Path.home() / ".cache" / "imrnns"
 
 
 def package_root() -> Path:
@@ -33,14 +27,10 @@ def package_root() -> Path:
 
 def discover_cached_embeddings(assets_root: Path) -> list[AssetMatch]:
     assets: list[AssetMatch] = []
+    if not assets_root.is_dir():
+        return assets
     for entry in sorted(assets_root.iterdir()):
         if not entry.is_dir():
-            continue
-
-        special = SPECIAL_CACHE_DIRS.get(entry.name)
-        if special:
-            encoder, dataset = special
-            assets.append(AssetMatch(encoder=encoder, dataset=dataset, path=entry))
             continue
 
         match = re.fullmatch(r"cache_(.+)_(.+)", entry.name)
@@ -53,23 +43,23 @@ def discover_cached_embeddings(assets_root: Path) -> list[AssetMatch]:
 
 def discover_checkpoints(assets_root: Path) -> list[AssetMatch]:
     assets: list[AssetMatch] = []
-    for entry in sorted(assets_root.glob("bihypernet_*.pt")):
-        match = re.fullmatch(r"bihypernet_(mini|e5|mpnet)(?:_(.+))?\.pt", entry.name)
+    for entry in sorted(assets_root.glob("imrnns-*.pt")):
+        match = re.fullmatch(r"imrnns-(minilm|e5|mpnet)-(.+)\.pt", entry.name)
         if not match:
             continue
         encoder, dataset = match.groups()
-        assets.append(AssetMatch(encoder=encoder, dataset=dataset or "msmarco", path=entry))
+        assets.append(AssetMatch(encoder=encoder_storage_key(encoder), dataset=dataset, path=entry))
     return assets
 
 
 def discover_repo_checkpoints(repo_root: Path) -> list[AssetMatch]:
     assets: list[AssetMatch] = []
-    base_dir = repo_root / "checkpoints" / "pretrained"
+    base_dir = repo_root / "checkpoints" / "validated"
     if not base_dir.exists():
         return assets
     for entry in sorted(base_dir.rglob("*.pt")):
         encoder = encoder_storage_key(entry.parent.name)
-        prefix = f"imrnns-{entry.parent.name}-"
+        prefix = f"imrnns-{encoder_storage_key(entry.parent.name)}-"
         if not entry.name.startswith(prefix) or not entry.name.endswith(".pt"):
             continue
         dataset = entry.name.removeprefix(prefix).removesuffix(".pt")

@@ -7,217 +7,88 @@ tags:
   - beir
   - pytorch
 pipeline_tag: sentence-similarity
-license: mit
+license: cc-by-4.0
 ---
 
 # IMRNNs
 
-<p align="center">
-  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/imrnns-given-wordmark-header.png" alt="IMRNNs" width="520" />
-</p>
+Interpretable Modular Retrieval Neural Networks rerank candidates from a frozen
+dense retriever using lightweight query/document embedding modulation.
 
-<p align="center">
-  <strong>Interpretable Modular Retrieval Neural Networks (IMRNNs)</strong>
-  <br />
-  Adapter-only checkpoint release for dense retriever adaptation
-</p>
+This repository provides the validated MiniLM–SciFact adapter at:
 
-<p align="center">
-  <a href="https://yashsaxena21.github.io/IMRNNs-web/">Website</a> ·
-  <a href="https://github.com/YashSaxena21/IMRNNs">GitHub</a> ·
-  <a href="https://aclanthology.org/2026.findings-eacl.333/">EACL 2026 Paper</a>
-</p>
-
-<p align="center">
-  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/imrnns-given-icon-tight.png" alt="IMRNNs mark" height="54" />
-  &nbsp;&nbsp;
-  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/hf-logo.svg" alt="Hugging Face" height="54" />
-  &nbsp;&nbsp;
-  <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="54" />
-</p>
-
-This repository hosts the released IMRNN checkpoints. Each checkpoint is adapter-only, and the corresponding base dense retriever is loaded separately by the `imrnns` package.
-
-## Important Training Note
-
-The released checkpoints are dataset-specific. They are not zero-shot checkpoints evaluated unchanged across all of BEIR.
-
-Examples:
-
-- `imrnns-minilm-trec-covid.pt` is trained for `trec-covid`
-- `imrnns-e5-nq.pt` is trained for `nq`
-
-If you want to train IMRNNs on another dataset or on another retriever, use the full GitHub implementation:
-
-- `https://github.com/YashSaxena21/IMRNNs`
+```text
+checkpoints/validated/minilm/imrnns-minilm-scifact.pt
+```
 
 ## Install
 
 ```bash
-pip install -r requirements.txt
-pip install -e .
+pip install imrnns
 ```
 
-## How to Get the Dataset and Embeddings
-
-The full data-preparation flow lives in the GitHub repository. The package downloads official BEIR datasets from:
-
-- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/<dataset>.zip`
-
-Example:
-
-- `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/trec-covid.zip`
-
-To build the cache for a dataset and retriever:
-
-```bash
-python -m imrnns cache \
-  --encoder minilm \
-  --dataset trec-covid \
-  --datasets-dir /path/to/datasets \
-  --cache-dir /path/to/cache_minilm_trec-covid \
-  --device cpu
-```
-
-That command downloads the dataset if needed, embeds the corpus and queries, and writes the training files required by IMRNNs.
-
-## Quick Start
-
-Load the matching base retriever and the released IMRNN adapter checkpoint:
+## Use
 
 ```python
 from imrnns import IMRNNAdapter
 
 adapter = IMRNNAdapter.from_pretrained(
     encoder="minilm",
-    dataset="trec-covid",
+    dataset="scifact",
     repo_id="yashsaxena21/IMRNNs",
     device="cpu",
 )
 
-scores = adapter.score(
-    query="What is the incubation period of COVID-19?",
+results = adapter.rerank(
+    query="What is scientific evidence?",
     documents=[
-        "COVID-19 symptoms can appear 2 to 14 days after exposure.",
-        "The stock market closed higher today.",
-        "Transmission risk depends on exposure setting and viral load.",
+        "Evidence supports or refutes a scientific claim.",
+        "A recipe describes how to prepare a meal.",
     ],
-    top_k=3,
 )
 
-for item in scores:
-    print(item.rank, item.score, item.text)
+for result in results:
+    print(result.rank, result.base_score, result.adapted_score, result.score_delta)
 ```
 
-## End-to-End Evaluation
+Use `rerank_embeddings()` to rerank NumPy arrays or PyTorch tensors without
+loading the text encoder.
 
-```python
-from pathlib import Path
+## SciFact test results
 
-from imrnns import cache_embeddings, load_pretrained
-from imrnns.beir_data import load_beir_source
-from imrnns.data import load_cached_split
-from imrnns.evaluation import evaluate_model
+| Metric | Raw MiniLM | IMRNN | Delta |
+| --- | ---: | ---: | ---: |
+| nDCG@10 | 0.64508 | 0.69166 | +0.04658 |
+| Recall@10 | 0.78333 | 0.84333 | +0.06000 |
+| MRR@10 | 0.60472 | 0.64800 | +0.04328 |
 
-encoder = "minilm"
-dataset = "trec-covid"
-repo_id = "yashsaxena21/IMRNNs"
-device = "cpu"
-k = 10
+Evaluation uses the complete official 300-query SciFact test set and identical
+top-100 candidate sets for raw and adapted ranking.
 
-model, metadata, encoder_spec = load_pretrained(
-    encoder=encoder,
-    dataset=dataset,
-    repo_id=repo_id,
-    device=device,
-)
+## Training recipe
 
-cache_dir = Path("demo_cache") / "cache_minilm_trec-covid"
-datasets_dir = Path("datasets")
-
-if not (cache_dir / "test" / "embeddings.pt").exists():
-    cache_embeddings(
-        encoder=encoder,
-        dataset=dataset,
-        cache_dir=cache_dir,
-        datasets_dir=datasets_dir,
-        device=device,
-    )
-
-source = load_beir_source(dataset, datasets_dir=datasets_dir)
-cached_test = load_cached_split(cache_dir, "test", source, encoder_spec, device)
-metrics = evaluate_model(
-    model=model,
-    cached_split=cached_test,
-    device=device,
-    feedback_k=100,
-    ranking_k=k,
-    k_values=[k],
-)
-
-print({"metrics": metrics, "metadata": metadata})
-```
-
-Reported metrics:
-
-- `MRR@10`
-- `Recall@10`
-- `NDCG@10`
-
-## Your Own Retriever
-
-If you trained IMRNNs on a different dense retriever, provide your own base model and checkpoint directly:
-
-```python
-from imrnns import IMRNNAdapter
-
-adapter = IMRNNAdapter.from_checkpoint(
-    checkpoint_path="my_imrnn_adapter.pt",
-    encoder_model_name="my-org/my-retriever",
-    embedding_dim=768,
-    query_prefix="query: ",
-    passage_prefix="passage: ",
-    device="cpu",
-)
-```
-
-## Released Checkpoints
-
-MiniLM:
-
-- `checkpoints/pretrained/minilm/imrnns-minilm-msmarco.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-fiqa.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-hotpotqa.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-nq.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-scifact.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-trec-covid.pt`
-- `checkpoints/pretrained/minilm/imrnns-minilm-webis-touche2020.pt`
-
-E5:
-
-- `checkpoints/pretrained/e5/imrnns-e5-msmarco.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-fiqa.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-hotpotqa.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-nq.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-scifact.pt`
-- `checkpoints/pretrained/e5/imrnns-e5-webis-touche2020.pt`
+- same-dimensional identity-initialized projector;
+- 128 hidden units, zero dropout;
+- 63 dense hard negatives from top 100;
+- improvement-margin objective with margin 0.05;
+- Adam, learning rate `1e-4`, weight decay `1e-5`, batch size 32;
+- 30 epochs maximum, patience 7, seed 42;
+- best epoch selected on validation mean nDCG@10, Recall@10, and MRR@10.
 
 ## Citation
 
 ```bibtex
 @inproceedings{saxena-etal-2026-imrnns,
   title = "{IMRNN}s: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation",
-  author = "Saxena, Yash and
-    Padia, Ankur and
-    Gunaratna, Kalpa and
-    Gaur, Manas",
+  author = "Saxena, Yash and Padia, Ankur and Gunaratna, Kalpa and Gaur, Manas",
   booktitle = "Findings of the Association for Computational Linguistics: EACL 2026",
-  month = mar,
   year = "2026",
-  address = "Rabat, Morocco",
-  publisher = "Association for Computational Linguistics",
-  url = "https://aclanthology.org/2026.findings-eacl.333/",
   doi = "10.18653/v1/2026.findings-eacl.333",
-  pages = "6324--6337"
+  url = "https://aclanthology.org/2026.findings-eacl.333/"
 }
 ```
+
+## License
+
+The code, scripts, documentation, and checkpoints are licensed under CC BY 4.0.
+See `LICENSE` and `ATTRIBUTION.md` in the repository.
