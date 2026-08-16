@@ -1,37 +1,90 @@
-# IMRNNs
+<p align="center">
+  <a href="https://yashsaxena21.github.io/IMRNNs-web/">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/imrnns-given-icon-tight.png" alt="IMRNNs" height="72">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://umbc.edu/">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/umbc-shield.png" alt="University of Maryland, Baltimore County" height="72">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://kai2.umbc.edu/">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/kai2-logo.jpg" alt="KAI2 Lab" height="72">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://2026.eacl.org/">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="72">
+  </a>
+</p>
 
-Interpretable Modular Retrieval Neural Networks (IMRNNs) rerank candidates from
-a frozen dense retriever using lightweight query/document embedding modulation.
+<h1 align="center">IMRNNs</h1>
 
-[EACL 2026 paper](https://aclanthology.org/2026.findings-eacl.333/) ·
-[Hugging Face checkpoint](https://huggingface.co/yashsaxena21/IMRNNs) ·
-[project website](https://yashsaxena21.github.io/IMRNNs-web/)
+<p align="center">
+  <strong>Interpretable Modular Retrieval Neural Networks</strong><br>
+  Efficient dense-retrieval reranking through lightweight embedding modulation.
+</p>
 
-This repository contains one implementation and one validated checkpoint:
-MiniLM trained for SciFact at
-`checkpoints/validated/minilm/imrnns-minilm-scifact.pt`.
+<p align="center">
+  <a href="https://pypi.org/project/imrnns/"><img src="https://img.shields.io/pypi/v/imrnns.svg?logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/imrnns/"><img src="https://img.shields.io/pypi/pyversions/imrnns.svg?logo=python&logoColor=white" alt="Supported Python versions"></a>
+  <a href="https://github.com/YashSaxena21/IMRNNs/actions/workflows/test.yml"><img src="https://github.com/YashSaxena21/IMRNNs/actions/workflows/test.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/YashSaxena21/IMRNNs/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY%204.0-blue.svg" alt="CC BY 4.0 license"></a>
+  <a href="https://doi.org/10.18653/v1/2026.findings-eacl.333"><img src="https://img.shields.io/badge/EACL%202026-paper-7b1fa2.svg" alt="EACL 2026 paper"></a>
+</p>
 
-## Install
+<p align="center">
+  <a href="https://aclanthology.org/2026.findings-eacl.333/"><strong>Paper</strong></a>
+  ·
+  <a href="https://pypi.org/project/imrnns/"><strong>PyPI</strong></a>
+  ·
+  <a href="https://huggingface.co/yashsaxena21/IMRNNs"><strong>Model checkpoint</strong></a>
+  ·
+  <a href="https://yashsaxena21.github.io/IMRNNs-web/"><strong>Project website</strong></a>
+  ·
+  <a href="https://yashsaxena21.github.io/Portfolio/"><strong>Author portfolio</strong></a>
+</p>
+
+---
+
+IMRNNs adds a small, trainable reranking layer to a frozen dense retriever. It
+modulates query and document embeddings, improves the ordering of an existing
+candidate set, and exposes how that modulation changes each retrieval score.
+The base encoder remains unchanged.
+
+The public release provides the installable Python package, command-line tools,
+reproducible training and evaluation workflows, and a validated MiniLM–SciFact
+checkpoint hosted on Hugging Face.
+
+## Highlights
+
+- **Lightweight adaptation** — train compact query and document adapters while
+  keeping the base retriever frozen.
+- **Drop-in reranking** — work with text directly or pass existing NumPy and
+  PyTorch embeddings.
+- **Interpretable scores** — inspect base scores, adapted scores, score deltas,
+  and vocabulary-level concepts.
+- **Strict evaluation** — compare raw and adapted nDCG@10, Recall@10, and
+  MRR@10 over identical candidate sets.
+- **Reproducible artifacts** — retain encoder revisions, data hashes, split
+  metadata, training history, and evaluation results in each checkpoint.
+
+## Installation
+
+Install the stable package from PyPI:
 
 ```bash
-pip install imrnns
+python -m pip install imrnns
 ```
 
-From this checkout:
+Install the optional training and BEIR evaluation dependencies:
 
 ```bash
-python -m pip install .
+python -m pip install "imrnns[train,eval]"
 ```
 
-Training and BEIR evaluation dependencies are optional:
+IMRNNs supports Python 3.10–3.12 and CPU inference. For local development, see
+the [development guide](#development).
 
-```bash
-python -m pip install ".[train,eval]"
-```
-
-Python 3.10–3.12 and CPU inference are supported.
-
-## Quickstart
+## Quick start
 
 ```python
 from imrnns import IMRNNAdapter
@@ -53,15 +106,42 @@ results = adapter.rerank(
 )
 
 for result in results:
-    print(result.rank, result.base_score, result.adapted_score, result.score_delta, result.text)
+    print(
+        result.rank,
+        result.base_score,
+        result.adapted_score,
+        result.score_delta,
+        result.text,
+    )
 ```
 
-Each result includes its rank, original index, optional document ID/text, raw
-base-retriever cosine score, adapted score, and score delta.
+`from_pretrained()` downloads the matching adapter checkpoint from
+[Hugging Face](https://huggingface.co/yashsaxena21/IMRNNs). Each result contains
+its rank, original index, optional document ID and text, base-retriever cosine
+score, adapted score, and score delta.
+
+## Validated results
+
+The included checkpoint was selected on SciFact validation and evaluated once
+on the complete official 300-query test set. Raw and adapted rankings use the
+same top-100 MiniLM candidates.
+
+| Metric | Raw MiniLM | IMRNN | Improvement |
+| --- | ---: | ---: | ---: |
+| nDCG@10 | 0.64508 | **0.69166** | **+0.04658** |
+| Recall@10 | 0.78333 | **0.84333** | **+0.06000** |
+| MRR@10 | 0.60472 | **0.64800** | **+0.04328** |
+
+The same recipe passed all three validation metrics on NFCorpus and ArguAna.
+Held-out testing passed the strict all-metrics rule on SciFact and ArguAna.
+See the
+[training study](https://github.com/YashSaxena21/IMRNNs/blob/main/TRAINING_STUDY.md)
+for full metrics and split details.
 
 ## Rerank existing embeddings
 
-`rerank_embeddings()` does not invoke a text encoder:
+`rerank_embeddings()` accepts NumPy arrays or PyTorch tensors and does not
+invoke a text encoder:
 
 ```python
 adapter = IMRNNAdapter.from_pretrained(
@@ -78,7 +158,7 @@ results = adapter.rerank_embeddings(
 )
 ```
 
-## Interpret a retrieval decision
+## Explain a retrieval decision
 
 ```python
 explanation = adapter.explain(
@@ -92,13 +172,13 @@ print(explanation.top_document_tokens)
 print(explanation.score_delta)
 ```
 
-The explanation back-projects query/document modulation vectors through the
-Moore–Penrose pseudoinverse of the learned projector and reports aligned
+The explanation back-projects the query and document modulation vectors through
+the Moore–Penrose pseudoinverse of the learned projector and reports aligned
 encoder-vocabulary concepts.
 
-## Training recipe
+## Training and evaluation
 
-Prepare a shared embedding and dense-negative cache:
+Build a shared embedding cache with dense hard negatives:
 
 ```bash
 imrnns cache \
@@ -108,7 +188,7 @@ imrnns cache \
   --device cpu
 ```
 
-Train and evaluate:
+Train an adapter:
 
 ```bash
 imrnns train \
@@ -118,42 +198,7 @@ imrnns train \
   --output-dir ./checkpoints
 ```
 
-The fixed recipe uses:
-
-- a same-dimensional projector initialized to identity;
-- 128 hidden units and zero dropout;
-- one highest-relevance positive and 63 dense hard negatives from the raw
-  retriever's top 100 per query;
-- improvement-margin loss
-  `mean(max(0, 0.05 + base_margin - adapted_margin))`;
-- Adam with learning rate `1e-4`, weight decay `1e-5`, and batch size 32;
-- up to 30 epochs with patience 7;
-- best-epoch selection by validation mean nDCG@10, Recall@10, and MRR@10,
-  including epoch 0 as a candidate.
-
-Training checkpoints store the exact encoder revision, cache manifest, split
-hashes, training history, base/adapted test metrics, metric deltas, and strict
-pass status. A dataset passes only when every adapted metric is greater than
-the corresponding base metric.
-
-## Validated results
-
-The included checkpoint was selected on SciFact validation and evaluated once
-on the complete official 300-query test set with the same top-100 candidates
-for the raw and adapted rankings.
-
-| Metric | Raw MiniLM | IMRNN | Delta |
-| --- | ---: | ---: | ---: |
-| nDCG@10 | 0.64508 | 0.69166 | +0.04658 |
-| Recall@10 | 0.78333 | 0.84333 | +0.06000 |
-| MRR@10 | 0.60472 | 0.64800 | +0.04328 |
-
-The recipe also passed all three validation metrics on NFCorpus and ArguAna.
-Held-out testing passed the strict all-metrics rule on SciFact and ArguAna;
-NFCorpus improved nDCG@10 and Recall@10 but missed MRR@10 by 0.00014. Full
-numbers and split details are in [TRAINING_STUDY.md](TRAINING_STUDY.md).
-
-## Evaluate a checkpoint
+Evaluate it against the frozen base retriever:
 
 ```bash
 imrnns evaluate \
@@ -164,12 +209,25 @@ imrnns evaluate \
   --checkpoint checkpoints/validated/minilm/imrnns-minilm-scifact.pt
 ```
 
-The JSON output includes `base_metrics`, adapted `metrics`, `metric_delta`, and
-`beats_base_all_metrics`.
+The evaluation JSON contains `base_metrics`, adapted `metrics`,
+`metric_delta`, and `beats_base_all_metrics`. A run passes only when every
+adapted metric is greater than its corresponding base metric.
+
+### Default training configuration
+
+- same-dimensional, identity-initialized projector;
+- 128 hidden units and zero dropout;
+- one highest-relevance positive and 63 dense hard negatives from the raw
+  retriever's top 100 results;
+- improvement-margin objective with margin `0.05`;
+- Adam with learning rate `1e-4`, weight decay `1e-5`, and batch size 32;
+- up to 30 epochs with patience 7;
+- best-epoch selection by validation mean nDCG@10, Recall@10, and MRR@10,
+  including epoch 0 as a candidate.
 
 ## Local BEIR-format datasets
 
-The loader accepts:
+IMRNNs also accepts local datasets with the standard BEIR layout:
 
 ```text
 my_dataset/
@@ -180,25 +238,32 @@ my_dataset/
     └── test.tsv
 ```
 
-For official train/test datasets, 15% of official train is reserved for
-validation and official test remains untouched. A dataset with one qrels split
-uses a deterministic 70/15/15 partition.
+For datasets with official train and test qrels, 15% of the official training
+queries are reserved for validation and the test set remains untouched. A
+dataset with one qrels split uses a deterministic 70/15/15 partition.
 
-## CLI
+Runnable examples are available in the
+[examples directory](https://github.com/YashSaxena21/IMRNNs/tree/main/examples).
 
-```text
-imrnns info
-imrnns download --encoder minilm --dataset scifact
-imrnns list-assets
-imrnns cache ...
-imrnns train ...
-imrnns evaluate ...
-imrnns run ...
-```
+## Command-line interface
+
+| Command | Purpose |
+| --- | --- |
+| `imrnns info` | Show package, checkpoint, and training-recipe information |
+| `imrnns download` | Download a released adapter checkpoint |
+| `imrnns list-assets` | List supported encoders and checkpoints |
+| `imrnns cache` | Prepare datasets, embeddings, and hard negatives |
+| `imrnns train` | Train and validate an adapter |
+| `imrnns evaluate` | Compare adapted and base-retriever metrics |
+| `imrnns run` | Execute the cache, train, and evaluate pipeline |
+
+Use `imrnns <command> --help` for complete options.
 
 ## Development
 
 ```bash
+git clone https://github.com/YashSaxena21/IMRNNs.git
+cd IMRNNs
 python -m pip install -e ".[dev]"
 pytest
 ruff check src tests scripts examples
@@ -206,7 +271,13 @@ python -m build
 twine check dist/*
 ```
 
+Bug reports, feature proposals, and focused pull requests are welcome through
+[GitHub Issues](https://github.com/YashSaxena21/IMRNNs/issues) and
+[GitHub Pull Requests](https://github.com/YashSaxena21/IMRNNs/pulls).
+
 ## Citation
+
+If IMRNNs supports your research, please cite the EACL 2026 paper:
 
 ```bibtex
 @inproceedings{saxena-etal-2026-imrnns,
@@ -220,8 +291,21 @@ twine check dist/*
 }
 ```
 
+## Authors and acknowledgments
+
+IMRNNs is authored by Yash Saxena, Ankur Padia, Kalpa Gunaratna, and Manas
+Gaur. Visit
+[Yash Saxena's portfolio](https://yashsaxena21.github.io/Portfolio/) for
+additional projects and publications.
+
+This work is associated with the
+[University of Maryland, Baltimore County](https://umbc.edu/) and the
+[KAI² Lab](https://kai2.umbc.edu/), and was published in the
+[Findings of EACL 2026](https://aclanthology.org/2026.findings-eacl.333/).
+
 ## License
 
-The code, scripts, documentation, and checkpoints are licensed under the
-[Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
-See [LICENSE](LICENSE) and [ATTRIBUTION.md](ATTRIBUTION.md).
+The code, scripts, documentation, and checkpoints are available under the
+[Creative Commons Attribution 4.0 International License](https://github.com/YashSaxena21/IMRNNs/blob/main/LICENSE).
+Attribution requirements are documented in
+[ATTRIBUTION.md](https://github.com/YashSaxena21/IMRNNs/blob/main/ATTRIBUTION.md).

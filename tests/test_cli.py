@@ -10,7 +10,7 @@ def test_cli_exposes_public_commands(capsys):
     assert "convert-checkpoint" not in help_text
     assert main(["info"]) == 0
     output = capsys.readouterr().out
-    assert '"version": "0.2.0"' in output
+    assert '"version": "0.2.1"' in output
     assert '"objective": "improvement-margin"' in output
 
 
