@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from huggingface_hub import HfApi
+from huggingface_hub import CommitOperationAdd, CommitOperationDelete, HfApi
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,7 +25,7 @@ def main() -> int:
     api = HfApi()
     api.create_repo(repo_id=args.repo_id, repo_type="model", private=args.private, exist_ok=True)
 
-    uploads = [
+    uploads: list[tuple[Path, str]] = [
         (repo_root / "huggingface" / "README.md", "README.md"),
         (repo_root / "huggingface" / "config.json", "config.json"),
         (repo_root / "LICENSE", "LICENSE"),
@@ -37,28 +37,52 @@ def main() -> int:
         (repo_root / "scripts" / "minimal_eval.py", "scripts/minimal_eval.py"),
     ]
 
-    for local_path, remote_path in uploads:
-        api.upload_file(
-            path_or_fileobj=str(local_path),
-            path_in_repo=remote_path,
-            repo_id=args.repo_id,
-            repo_type="model",
+    folder_uploads = [
+        (repo_root / "checkpoints" / "validated", "checkpoints/validated"),
+        (repo_root / "src" / "imrnns", "src/imrnns"),
+    ]
+    for folder_path, remote_root in folder_uploads:
+        uploads.extend(
+            (local_path, f"{remote_root}/{local_path.relative_to(folder_path).as_posix()}")
+            for local_path in sorted(folder_path.rglob("*"))
+            if local_path.is_file()
         )
 
-    api.upload_folder(
-        folder_path=str(repo_root / "checkpoints" / "validated"),
-        path_in_repo="checkpoints/validated",
-        repo_id=args.repo_id,
-        repo_type="model",
+    desired_checkpoints = {
+        remote_path for _, remote_path in uploads if remote_path.startswith("checkpoints/")
+    }
+    remote_files = set(api.list_repo_files(repo_id=args.repo_id, repo_type="model"))
+    obsolete_checkpoints = sorted(
+        remote_path
+        for remote_path in remote_files
+        if remote_path.startswith("checkpoints/") and remote_path not in desired_checkpoints
     )
-    api.upload_folder(
-        folder_path=str(repo_root / "src" / "imrnns"),
-        path_in_repo="src/imrnns",
+
+    operations = [
+        CommitOperationDelete(path_in_repo=remote_path)
+        for remote_path in obsolete_checkpoints
+    ]
+    operations.extend(
+        CommitOperationAdd(path_in_repo=remote_path, path_or_fileobj=local_path)
+        for local_path, remote_path in uploads
+    )
+
+    parent_commit = api.model_info(repo_id=args.repo_id).sha
+    api.create_commit(
         repo_id=args.repo_id,
         repo_type="model",
+        operations=operations,
+        commit_message="Publish the current IMRNNs release",
+        commit_description=(
+            "Synchronize the model card, package sources, release metadata, and "
+            "checkpoint set with the current public release."
+        ),
+        parent_commit=parent_commit,
     )
 
     print(f"Published Hugging Face model repo: https://huggingface.co/{args.repo_id}")
+    if obsolete_checkpoints:
+        print(f"Removed {len(obsolete_checkpoints)} superseded checkpoint file(s).")
     return 0
 
 
