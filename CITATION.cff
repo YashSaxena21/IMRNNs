@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use IMRNNs, please cite the EACL 2026 paper."
 title: "IMRNNs: An Efficient Method for Interpretable Dense Retrieval via Embedding Modulation"
 type: software
-version: 0.2.1
+version: 0.2.2
 date-released: 2026-08-16
 license: CC-BY-4.0
 repository-code: "https://github.com/YashSaxena21/IMRNNs"

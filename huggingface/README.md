@@ -12,8 +12,8 @@ license: cc-by-4.0
 
 # IMRNNs
 
-Interpretable Modular Retrieval Neural Networks rerank candidates from a frozen
-dense retriever using lightweight query/document embedding modulation.
+Interpretable Modular Retrieval Neural Networks augment a frozen dense
+retriever with dynamic, bidirectional query/document embedding modulation.
 
 This repository provides the validated MiniLM–SciFact adapter at:
 
@@ -39,7 +39,7 @@ adapter = IMRNNAdapter.from_pretrained(
     device="cpu",
 )
 
-results = adapter.rerank(
+results = adapter.rank(
     query="What is scientific evidence?",
     documents=[
         "Evidence supports or refutes a scientific claim.",
@@ -51,8 +51,8 @@ for result in results:
     print(result.rank, result.base_score, result.adapted_score, result.score_delta)
 ```
 
-Use `rerank_embeddings()` to rerank NumPy arrays or PyTorch tensors without
-loading the text encoder.
+Use `rank_embeddings()` to score and rank NumPy arrays or PyTorch tensors
+without loading the text encoder.
 
 ## SciFact test results
 

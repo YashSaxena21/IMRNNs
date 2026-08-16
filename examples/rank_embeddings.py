@@ -9,7 +9,7 @@ adapter = IMRNNAdapter.from_pretrained(
 )
 query_embedding = np.random.default_rng(42).normal(size=384).astype("float32")
 document_embeddings = np.random.default_rng(7).normal(size=(100, 384)).astype("float32")
-results = adapter.rerank_embeddings(
+results = adapter.rank_embeddings(
     query_embedding,
     document_embeddings,
     document_ids=[f"doc-{index}" for index in range(100)],

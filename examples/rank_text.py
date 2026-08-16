@@ -1,7 +1,7 @@
 from imrnns import IMRNNAdapter
 
 adapter = IMRNNAdapter.from_pretrained(encoder="minilm", dataset="scifact")
-results = adapter.rerank(
+results = adapter.rank(
     query="What is the incubation period of COVID-19?",
     documents=[
         "Symptoms can appear 2 to 14 days after exposure.",

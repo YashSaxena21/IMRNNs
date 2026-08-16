@@ -7,16 +7,22 @@ from imrnns.checkpoints import save_checkpoint
 from imrnns.model import IMRNN, ModelConfig
 
 
-def test_text_rerank_returns_structured_scores():
+def test_text_rank_returns_structured_scores():
     adapter, encoder = make_adapter()
-    results = adapter.rerank("query", ["first", "second", "third"], document_ids=["a", "b", "c"], top_k=2)
+    results = adapter.rank("query", ["first", "second", "third"], document_ids=["a", "b", "c"], top_k=2)
     assert len(results) == 2
     assert [result.rank for result in results] == [1, 2]
     assert {result.document_id for result in results}.issubset({"a", "b", "c"})
     assert encoder.calls == 2
 
 
-def test_text_rerank_empty_does_not_encode():
+def test_text_rank_empty_does_not_encode():
+    adapter, encoder = make_adapter()
+    assert adapter.rank("query", []) == []
+    assert encoder.calls == 0
+
+
+def test_legacy_rerank_alias_remains_compatible():
     adapter, encoder = make_adapter()
     assert adapter.rerank("query", []) == []
     assert encoder.calls == 0

@@ -4,15 +4,19 @@
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://umbc.edu/">
-    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/umbc-shield.png" alt="University of Maryland, Baltimore County" height="72">
+    <img src="https://styleguide.umbc.edu/wp-content/uploads/sites/113/2019/01/UMBC-primary-logo-RGB-1024x236.png" alt="University of Maryland, Baltimore County" height="52">
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://kai2.umbc.edu/">
-    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/kai2-logo.jpg" alt="KAI2 Lab" height="72">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/kai2-logo.jpg" alt="KAI2 Lab" height="60">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://huggingface.co/yashsaxena21/IMRNNs">
+    <img src="https://huggingface.co/datasets/huggingface/brand-assets/resolve/main/hf-logo-with-title.svg" alt="Hugging Face" height="52">
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://2026.eacl.org/">
-    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="72">
+    <img src="https://yashsaxena21.github.io/IMRNNs-web/assets/eacl2026-logo.png" alt="EACL 2026" height="60">
   </a>
 </p>
 
@@ -20,7 +24,7 @@
 
 <p align="center">
   <strong>Interpretable Modular Retrieval Neural Networks</strong><br>
-  Efficient dense-retrieval reranking through lightweight embedding modulation.
+  Efficient, interpretable dense retrieval through dynamic embedding modulation.
 </p>
 
 <p align="center">
@@ -45,10 +49,13 @@
 
 ---
 
-IMRNNs adds a small, trainable reranking layer to a frozen dense retriever. It
-modulates query and document embeddings, improves the ordering of an existing
-candidate set, and exposes how that modulation changes each retrieval score.
-The base encoder remains unchanged.
+IMRNNs augments a frozen dense retriever with dynamic, bidirectional modulation
+at inference time. A Query Adapter conditions document embeddings on the query,
+while a Document Adapter uses corpus-level feedback to adapt the query
+embedding. Documents are scored with cosine similarity in the resulting
+modulated embedding space, and the base encoder remains unchanged. IMRNNs stays
+within the initial dense-retrieval stage and does not add a downstream
+cross-encoder stage.
 
 The public release provides the installable Python package, command-line tools,
 reproducible training and evaluation workflows, and a validated MiniLM–SciFact
@@ -58,10 +65,10 @@ checkpoint hosted on Hugging Face.
 
 - **Lightweight adaptation** — train compact query and document adapters while
   keeping the base retriever frozen.
-- **Drop-in reranking** — work with text directly or pass existing NumPy and
+- **Drop-in retrieval adaptation** — rank text directly or pass existing NumPy and
   PyTorch embeddings.
-- **Interpretable scores** — inspect base scores, adapted scores, score deltas,
-  and vocabulary-level concepts.
+- **Multi-level interpretability** — inspect explicit transformations,
+  modulation vectors, score deltas, and vocabulary-level semantic concepts.
 - **Strict evaluation** — compare raw and adapted nDCG@10, Recall@10, and
   MRR@10 over identical candidate sets.
 - **Reproducible artifacts** — retain encoder revisions, data hashes, split
@@ -95,7 +102,7 @@ adapter = IMRNNAdapter.from_pretrained(
     device="cpu",
 )
 
-results = adapter.rerank(
+results = adapter.rank(
     query="What is scientific evidence?",
     documents=[
         "Evidence is used to support or refute a scientific claim.",
@@ -138,9 +145,9 @@ See the
 [training study](https://github.com/YashSaxena21/IMRNNs/blob/main/TRAINING_STUDY.md)
 for full metrics and split details.
 
-## Rerank existing embeddings
+## Rank existing embeddings
 
-`rerank_embeddings()` accepts NumPy arrays or PyTorch tensors and does not
+`rank_embeddings()` accepts NumPy arrays or PyTorch tensors and does not
 invoke a text encoder:
 
 ```python
@@ -150,7 +157,7 @@ adapter = IMRNNAdapter.from_pretrained(
     load_encoder=False,
 )
 
-results = adapter.rerank_embeddings(
+results = adapter.rank_embeddings(
     query_embedding=query_embedding,
     document_embeddings=document_embeddings,
     document_ids=document_ids,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 — 2026-08-16
+
+- Corrected the public terminology to describe IMRNNs as a dense-retrieval
+  adapter using dynamic, bidirectional embedding modulation and modulated-space
+  ranking.
+- Added canonical `rank()` and `rank_embeddings()` APIs while retaining the
+  previous method names as compatibility aliases.
+
 ## 0.2.1 — 2026-08-16
 
 - Reworked the shared GitHub and PyPI README with a professional project
@@ -8,7 +16,7 @@
 
 ## 0.2.0 — 2026-08-16
 
-- Added text and embedding-native reranking through `IMRNNAdapter`.
+- Added text and embedding-native retrieval ranking through `IMRNNAdapter`.
 - Added Moore–Penrose vocabulary-concept explanations.
 - Standardized one query/document modulation architecture with a square
   identity-initialized projector, 128 hidden units, and zero dropout.
