@@ -2,17 +2,36 @@
   "model_type": "imrnns",
   "architectures": ["IMRNN"],
   "library_name": "imrnns",
-  "paper": "https://arxiv.org/abs/2601.20084",
+  "license": "cc-by-4.0",
+  "paper": "https://aclanthology.org/2026.findings-eacl.333/",
+  "doi": "10.18653/v1/2026.findings-eacl.333",
   "github_repo": "https://github.com/YashSaxena21/IMRNNs",
+  "checkpoint_format": "imrnns-final-v1",
+  "available_checkpoints": [
+    "checkpoints/validated/minilm/imrnns-minilm-scifact.pt"
+  ],
+  "training_recipe": {
+    "objective": "improvement-margin",
+    "improvement_margin": 0.05,
+    "hard_negative_method": "dense",
+    "hard_negatives": 63,
+    "hard_negative_pool": 100,
+    "projector_initialization": "identity",
+    "hidden_dim": 128,
+    "dropout": 0.0,
+    "optimizer": "adam",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.00001,
+    "batch_size": 32,
+    "epochs": 30,
+    "patience": 7,
+    "seed": 42
+  },
   "metrics": ["MRR@10", "Recall@10", "NDCG@10"],
-  "supported_encoders": {
-    "minilm": {
-      "base_model": "sentence-transformers/all-MiniLM-L6-v2",
-      "embedding_dim": 384
-    },
-    "e5": {
-      "base_model": "intfloat/e5-large-v2",
-      "embedding_dim": 1024
-    }
+  "encoder": {
+    "alias": "minilm",
+    "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "embedding_dim": 384,
+    "revision": "c9745ed1d9f207416be6d2e6f8de32d1f16199bf"
   }
 }

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Optional
-import re
 
 
 @dataclass(frozen=True)
@@ -12,6 +12,7 @@ class EncoderSpec:
     embedding_dim: int
     query_prefix: str = ""
     passage_prefix: str = ""
+    revision: str | None = None
 
 
 ENCODER_SPECS = {
@@ -19,6 +20,7 @@ ENCODER_SPECS = {
         key="mini",
         model_name="sentence-transformers/all-MiniLM-L6-v2",
         embedding_dim=384,
+        revision="c9745ed1d9f207416be6d2e6f8de32d1f16199bf",
     ),
     "e5": EncoderSpec(
         key="e5",
@@ -26,6 +28,7 @@ ENCODER_SPECS = {
         embedding_dim=1024,
         query_prefix="query: ",
         passage_prefix="passage: ",
+        revision="f169b11e22de13617baa190a028a32f3493550b6",
     ),
     "mpnet": EncoderSpec(
         key="mpnet",
@@ -70,6 +73,7 @@ def resolve_encoder_spec(
     embedding_dim: Optional[int] = None,
     query_prefix: str = "",
     passage_prefix: str = "",
+    encoder_revision: str | None = None,
 ) -> EncoderSpec:
     if encoder_model_name is not None:
         if embedding_dim is None:
@@ -81,6 +85,7 @@ def resolve_encoder_spec(
             embedding_dim=embedding_dim,
             query_prefix=query_prefix,
             passage_prefix=passage_prefix,
+            revision=encoder_revision,
         )
 
     if encoder is None:

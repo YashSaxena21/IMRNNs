@@ -1,17 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
-import math
-import re
-from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import torch
+import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
-from .beir_data import DatasetSplit, load_beir_splits
+from .beir_data import load_beir_splits
 from .encoders import EncoderSpec
 
 
@@ -24,85 +23,6 @@ def _document_text(document: Dict[str, str], encoder_spec: EncoderSpec) -> str:
 
 def _query_text(query: str, encoder_spec: EncoderSpec) -> str:
     return f"{encoder_spec.query_prefix}{query}" if encoder_spec.query_prefix else query
-
-
-class BM25NegativeMiner:
-    def __init__(self, k1: float = 1.2, b: float = 0.75) -> None:
-        self.k1 = k1
-        self.b = b
-        self.stopwords = {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
-            "with", "by", "is", "are", "was", "were", "be", "been", "being", "have",
-            "has", "had", "do", "does", "did", "will", "would", "could", "should",
-            "may", "might", "must", "can", "this", "that", "these", "those",
-        }
-        self.postings: Dict[str, List[tuple[int, int]]] = defaultdict(list)
-        self.idf: Dict[str, float] = {}
-        self.doc_lengths: Dict[int, int] = {}
-        self.doc_ids: List[str] = []
-        self.avgdl = 0.0
-
-    def _tokenize(self, text: str) -> List[str]:
-        tokens = re.findall(r"\b[a-zA-Z]+\b", text.lower())
-        return [token for token in tokens if token not in self.stopwords and len(token) > 2]
-
-    def fit(self, corpus: Dict[str, Dict[str, str]]) -> None:
-        self.doc_ids = list(corpus.keys())
-        term_doc_freq: Dict[str, set[int]] = defaultdict(set)
-        total_length = 0
-
-        for doc_idx, doc_id in enumerate(tqdm(self.doc_ids, desc="index bm25", leave=False)):
-            text = f"{corpus[doc_id].get('title', '')} {corpus[doc_id].get('text', '')}".strip()
-            tokens = self._tokenize(text)
-            total_length += len(tokens)
-            self.doc_lengths[doc_idx] = len(tokens)
-
-            term_freq: Dict[str, int] = defaultdict(int)
-            for token in tokens:
-                term_freq[token] += 1
-            for token, tf in term_freq.items():
-                self.postings[token].append((doc_idx, tf))
-                term_doc_freq[token].add(doc_idx)
-
-        self.avgdl = total_length / max(len(self.doc_ids), 1)
-        total_docs = len(self.doc_ids)
-        for token, doc_set in term_doc_freq.items():
-            df = len(doc_set)
-            self.idf[token] = math.log(1 + (total_docs - df + 0.5) / (df + 0.5))
-
-    def mine(
-        self,
-        queries: Dict[str, str],
-        qrels: Dict[str, Dict[str, int]],
-        num_negatives: int,
-        top_k: int,
-    ) -> Dict[str, List[str]]:
-        negatives: Dict[str, List[str]] = {}
-        for qid, query in tqdm(queries.items(), desc="mine negatives", leave=False):
-            if qid not in qrels:
-                continue
-            scores = [0.0] * len(self.doc_ids)
-            for token in self._tokenize(query):
-                if token not in self.postings:
-                    continue
-                idf = self.idf[token]
-                for doc_idx, tf in self.postings[token]:
-                    dl = self.doc_lengths[doc_idx]
-                    norm = self.k1 * (1 - self.b + self.b * (dl / self.avgdl))
-                    scores[doc_idx] += idf * ((tf * (self.k1 + 1)) / (tf + norm))
-
-            positive_doc_ids = {doc_id for doc_id, rel in qrels[qid].items() if rel > 0}
-            ranked = sorted(range(len(scores)), key=lambda idx: scores[idx], reverse=True)[:top_k]
-            mined: List[str] = []
-            for idx in ranked:
-                doc_id = self.doc_ids[idx]
-                if doc_id in positive_doc_ids:
-                    continue
-                mined.append(doc_id)
-                if len(mined) >= num_negatives:
-                    break
-            negatives[qid] = mined
-        return negatives
 
 
 def _encode_texts(
@@ -131,6 +51,95 @@ def _encode_texts(
     return outputs
 
 
+def mine_dense_negatives(
+    query_embeddings: Dict[str, torch.Tensor],
+    document_embeddings: Dict[str, torch.Tensor],
+    qrels: Dict[str, Dict[str, int]],
+    *,
+    num_negatives: int,
+    top_k: int,
+    device: str,
+    batch_size: int = 128,
+) -> Dict[str, List[str]]:
+    """Mine hard negatives using raw cosine similarity from the base encoder."""
+
+    if num_negatives <= 0 or top_k <= 0 or batch_size <= 0:
+        raise ValueError("num_negatives, top_k, and batch_size must be positive.")
+    document_ids = sorted(document_embeddings)
+    if not document_ids:
+        return {}
+    document_matrix = F.normalize(
+        torch.stack([document_embeddings[document_id].float() for document_id in document_ids]),
+        p=2,
+        dim=-1,
+    ).to(device)
+    query_ids = sorted(query_id for query_id in query_embeddings if query_id in qrels)
+    negatives: Dict[str, List[str]] = {}
+    retrieval_k = min(top_k, len(document_ids))
+    with torch.no_grad():
+        for start in tqdm(range(0, len(query_ids), batch_size), desc="mine dense negatives", leave=False):
+            batch_ids = query_ids[start : start + batch_size]
+            query_matrix = F.normalize(
+                torch.stack([query_embeddings[query_id].float() for query_id in batch_ids]),
+                p=2,
+                dim=-1,
+            ).to(device)
+            ranked_indices = torch.topk(query_matrix @ document_matrix.T, k=retrieval_k, dim=1).indices.cpu()
+            for query_id, indices in zip(batch_ids, ranked_indices):
+                positive_ids = {document_id for document_id, relevance in qrels[query_id].items() if relevance > 0}
+                mined = [document_ids[index] for index in indices.tolist() if document_ids[index] not in positive_ids]
+                negatives[query_id] = mined[:num_negatives]
+    return negatives
+
+
+def _cache_is_reusable(
+    cache_dir: Path,
+    *,
+    dataset_name: str,
+    encoder_spec: EncoderSpec,
+    num_negatives: int,
+    negative_pool: int,
+    max_queries: Optional[int],
+    seed: int,
+) -> bool:
+    manifest_path = cache_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    if not isinstance(manifest, dict):
+        return False
+    expected = {
+        "schema_version": 2,
+        "dataset": dataset_name,
+        "encoder": encoder_spec.key,
+        "model_name": encoder_spec.model_name,
+        "model_revision": encoder_spec.revision,
+        "num_negatives": num_negatives,
+        "negative_pool": negative_pool,
+        "negative_method": "dense",
+        "max_queries": max_queries,
+        "seed": seed,
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        return False
+    required = [
+        cache_dir / "documents" / "ids.json",
+        cache_dir / "documents" / "embeddings.pt",
+    ]
+    for split_name in ("train", "validation", "test"):
+        required.extend(
+            [
+                cache_dir / split_name / "query_ids.json",
+                cache_dir / split_name / "query_embeddings.pt",
+                cache_dir / split_name / "negatives.json",
+            ]
+        )
+    return all(path.is_file() for path in required)
+
+
 def build_cache(
     dataset_name: str,
     encoder_spec: EncoderSpec,
@@ -138,47 +147,96 @@ def build_cache(
     datasets_dir: Path,
     device: str,
     batch_size: int = 64,
-    num_negatives: int = 20,
-    negative_pool: int = 200,
+    num_negatives: int = 63,
+    negative_pool: int = 100,
     max_queries: Optional[int] = None,
+    seed: int = 42,
 ) -> Path:
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive.")
+    if num_negatives <= 0:
+        raise ValueError("num_negatives must be positive.")
+    if negative_pool < num_negatives:
+        raise ValueError("negative_pool must be at least num_negatives.")
     cache_dir.mkdir(parents=True, exist_ok=True)
-    splits = load_beir_splits(dataset_name, datasets_dir=datasets_dir, max_queries=max_queries)
-    model = SentenceTransformer(encoder_spec.model_name, device=device)
-    negative_miner = BM25NegativeMiner()
+    if _cache_is_reusable(
+        cache_dir,
+        dataset_name=dataset_name,
+        encoder_spec=encoder_spec,
+        num_negatives=num_negatives,
+        negative_pool=negative_pool,
+        max_queries=max_queries,
+        seed=seed,
+    ):
+        return cache_dir
+    splits = load_beir_splits(
+        dataset_name,
+        datasets_dir=datasets_dir,
+        max_queries=max_queries,
+        seed=seed,
+    )
+    model = SentenceTransformer(
+        encoder_spec.model_name,
+        device=device,
+        revision=encoder_spec.revision,
+    )
     corpus = splits["train"].corpus
-    negative_miner.fit(corpus)
 
-    document_texts = [(doc_id, _document_text(document, encoder_spec)) for doc_id, document in corpus.items()]
+    document_texts = [(doc_id, _document_text(corpus[doc_id], encoder_spec)) for doc_id in sorted(corpus)]
     document_embeddings = _encode_texts(model, document_texts, batch_size=batch_size, device=device)
 
+    documents_dir = cache_dir / "documents"
+    documents_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(document_embeddings, documents_dir / "embeddings.pt")
+    with open(documents_dir / "ids.json", "w", encoding="utf-8") as handle:
+        json.dump(list(document_embeddings), handle)
+
+    split_manifest: dict[str, dict[str, object]] = {}
     for split_name, split in splits.items():
         split_dir = cache_dir / split_name
         split_dir.mkdir(parents=True, exist_ok=True)
 
-        query_texts = [(qid, _query_text(query, encoder_spec)) for qid, query in split.queries.items()]
+        query_texts = [(qid, _query_text(split.queries[qid], encoder_spec)) for qid in sorted(split.queries)]
         query_embeddings = _encode_texts(model, query_texts, batch_size=batch_size, device=device)
-        negatives = negative_miner.mine(
-            split.queries,
+        negatives = mine_dense_negatives(
+            query_embeddings,
+            document_embeddings,
             split.qrels,
             num_negatives=num_negatives,
             top_k=negative_pool,
+            device=device,
         )
 
-        torch.save(document_embeddings, split_dir / "embeddings.pt")
-        torch.save(query_embeddings, split_dir / f"query_embeddings_{encoder_spec.key}.pt")
-        with open(split_dir / "negatives.json", "w") as handle:
+        torch.save(query_embeddings, split_dir / "query_embeddings.pt")
+        with open(split_dir / "negatives.json", "w", encoding="utf-8") as handle:
             json.dump(negatives, handle)
+        query_ids = sorted(split.queries)
+        with open(split_dir / "query_ids.json", "w", encoding="utf-8") as handle:
+            json.dump(query_ids, handle, indent=2)
+        split_manifest[split_name] = {
+            "query_count": len(query_ids),
+            "query_ids_sha256": hashlib.sha256("\n".join(query_ids).encode()).hexdigest(),
+        }
 
     manifest = {
         "dataset": dataset_name,
         "encoder": encoder_spec.key,
         "model_name": encoder_spec.model_name,
+        "model_revision": encoder_spec.revision,
         "cache_dir": str(cache_dir),
         "num_negatives": num_negatives,
         "negative_pool": negative_pool,
+        "negative_method": "dense",
         "max_queries": max_queries,
+        "seed": seed,
+        "schema_version": 2,
+        "documents": {
+            "count": len(document_embeddings),
+            "path": "documents/embeddings.pt",
+            "ids_sha256": hashlib.sha256("\n".join(document_embeddings).encode()).hexdigest(),
+        },
+        "splits": split_manifest,
     }
-    with open(cache_dir / "manifest.json", "w") as handle:
+    with open(cache_dir / "manifest.json", "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2)
     return cache_dir

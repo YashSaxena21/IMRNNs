@@ -21,16 +21,23 @@ class CachedSplit:
     negatives: dict[str, list[str]]
 
 
-def _query_cache_path(cache_dir: Path, split_name: str, encoder_key: str) -> Path:
-    return cache_dir / split_name / f"query_embeddings_{encoder_key}.pt"
+def _query_cache_path(cache_dir: Path, split_name: str) -> Path:
+    return _split_dir(cache_dir, split_name) / "query_embeddings.pt"
 
 
-def load_document_embeddings(cache_dir: Path, split_name: str) -> dict[str, torch.Tensor]:
-    return torch.load(cache_dir / split_name / "embeddings.pt", map_location="cpu", weights_only=True)
+def _split_dir(cache_dir: Path, split_name: str) -> Path:
+    return cache_dir / split_name
+
+
+def load_document_embeddings(cache_dir: Path) -> dict[str, torch.Tensor]:
+    path = cache_dir / "documents" / "embeddings.pt"
+    if not path.is_file():
+        raise FileNotFoundError(f"Document embedding cache is missing: {path}")
+    return torch.load(path, map_location="cpu", weights_only=True)
 
 
 def load_negatives(cache_dir: Path, split_name: str) -> dict[str, list[str]]:
-    with open(cache_dir / split_name / "negatives.json") as handle:
+    with open(_split_dir(cache_dir, split_name) / "negatives.json", encoding="utf-8") as handle:
         return json.load(handle)
 
 
@@ -42,13 +49,17 @@ def encode_queries(
     device: str,
     batch_size: int = 64,
 ) -> dict[str, torch.Tensor]:
-    cache_path = _query_cache_path(cache_dir, split_name, encoder_spec.key)
+    cache_path = _query_cache_path(cache_dir, split_name)
     if cache_path.exists():
         return torch.load(cache_path, map_location="cpu", weights_only=True)
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    model = SentenceTransformer(encoder_spec.model_name, device=device)
-    query_ids = list(queries.keys())
+    model = SentenceTransformer(
+        encoder_spec.model_name,
+        device=device,
+        revision=encoder_spec.revision,
+    )
+    query_ids = sorted(queries)
     texts = [encoder_spec.query_prefix + queries[qid] for qid in query_ids]
     encoded = model.encode(
         texts,
@@ -84,7 +95,7 @@ def load_cached_split(
     )
     return CachedSplit(
         split=filtered_split,
-        document_embeddings=load_document_embeddings(cache_dir, split_name),
+        document_embeddings=load_document_embeddings(cache_dir),
         query_embeddings=encode_queries(filtered_split.queries, encoder_spec, cache_dir, split_name, device),
         negatives=negatives,
     )
@@ -96,6 +107,8 @@ class ContrastiveCachedDataset(Dataset):
         cached_split: CachedSplit,
         num_negatives: int,
     ) -> None:
+        if num_negatives <= 0:
+            raise ValueError("num_negatives must be positive.")
         self.cached_split = cached_split
         self.num_negatives = num_negatives
         self.examples: list[tuple[str, str, list[str]]] = []
@@ -103,11 +116,20 @@ class ContrastiveCachedDataset(Dataset):
         for qid, qrel in cached_split.split.qrels.items():
             if qid not in cached_split.query_embeddings:
                 continue
-            positives = [doc_id for doc_id, rel in qrel.items() if rel > 0 and doc_id in cached_split.document_embeddings]
-            negatives = [doc_id for doc_id in cached_split.negatives.get(qid, []) if doc_id in cached_split.document_embeddings]
+            positives = sorted(
+                (
+                    (doc_id, relevance)
+                    for doc_id, relevance in qrel.items()
+                    if relevance > 0 and doc_id in cached_split.document_embeddings
+                ),
+                key=lambda item: (-item[1], item[0]),
+            )
+            negatives = [
+                doc_id for doc_id in cached_split.negatives.get(qid, []) if doc_id in cached_split.document_embeddings
+            ]
             if not positives or not negatives:
                 continue
-            self.examples.append((qid, positives[0], negatives[:num_negatives]))
+            self.examples.append((qid, positives[0][0], negatives[:num_negatives]))
 
     def __len__(self) -> int:
         return len(self.examples)
@@ -117,8 +139,6 @@ class ContrastiveCachedDataset(Dataset):
         query_embedding = self.cached_split.query_embeddings[qid].float()
         positive_embedding = self.cached_split.document_embeddings[positive_id].float()
         normalized_negative_ids = list(negative_ids[: self.num_negatives])
-        if not normalized_negative_ids:
-            normalized_negative_ids = [positive_id] * self.num_negatives
         while len(normalized_negative_ids) < self.num_negatives:
             normalized_negative_ids.append(normalized_negative_ids[-1])
 
