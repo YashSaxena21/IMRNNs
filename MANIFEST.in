@@ -4,6 +4,7 @@ include ATTRIBUTION.md
 include LICENSE
 include TRAINING_STUDY.md
 include requirements.txt
+recursive-include assets *
 recursive-include checkpoints/validated *.pt
 recursive-include examples *.py
 recursive-include huggingface *.json *.md

@@ -38,6 +38,7 @@ def main() -> int:
     ]
 
     folder_uploads = [
+        (repo_root / "assets" / "brand", "assets/brand"),
         (repo_root / "checkpoints" / "validated", "checkpoints/validated"),
         (repo_root / "src" / "imrnns", "src/imrnns"),
     ]
