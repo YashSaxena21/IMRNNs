@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-08-16
+
+- Reworked the shared GitHub and PyPI README with a professional project
+  header, linked organization marks, package and CI badges, concise navigation,
+  clearer usage documentation, and an author portfolio link.
+
 ## 0.2.0 — 2026-08-16
 
 - Added text and embedding-native reranking through `IMRNNAdapter`.
