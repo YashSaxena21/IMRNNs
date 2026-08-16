@@ -178,12 +178,12 @@ def evaluate_model_with_baseline(
 
             _, _, adapted_scores = model.score_candidates(query_embedding.float().to(device), candidate_embeddings)
             adapted_scores = adapted_scores.cpu().tolist()
-            reranked = [
+            ranked = [
                 doc_id
                 for doc_id, _ in sorted(zip(candidate_ids, adapted_scores), key=lambda item: item[1], reverse=True)
             ][:ranking_k]
 
-            adapted_metrics = _compute_metrics(reranked, cached_split.split.qrels[qid], k_values)
+            adapted_metrics = _compute_metrics(ranked, cached_split.split.qrels[qid], k_values)
             base_metrics = _compute_metrics(base_ranked, cached_split.split.qrels[qid], k_values)
             for name, value in adapted_metrics.items():
                 adapted_values[name].append(value)

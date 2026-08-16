@@ -45,7 +45,7 @@ def _as_float_tensor(value: np.ndarray | torch.Tensor | Sequence[float], *, name
 
 
 class IMRNNAdapter:
-    """Public inference wrapper for text and embedding-native reranking."""
+    """Public inference wrapper for text and embedding-native retrieval ranking."""
 
     def __init__(
         self,
@@ -174,12 +174,12 @@ class IMRNNAdapter:
     def _require_encoder(self) -> tuple[Any, EncoderSpec]:
         if self.encoder is None or self.encoder_spec is None:
             raise RuntimeError(
-                "This adapter was loaded without a text encoder. Use rerank_embeddings(), or reload with an "
+                "This adapter was loaded without a text encoder. Use rank_embeddings(), or reload with an "
                 "encoder configuration and load_encoder=True."
             )
         return self.encoder, self.encoder_spec
 
-    def rerank(
+    def rank(
         self,
         query: str,
         documents: Sequence[str],
@@ -205,11 +205,38 @@ class IMRNNAdapter:
                 show_progress_bar=False,
                 device=self.device,
             )
-        return self._rerank_embeddings(
+        return self._rank_embeddings(
             query_embedding=query_embedding,
             document_embeddings=document_embeddings,
             document_ids=document_ids,
             texts=documents,
+            top_k=top_k,
+        )
+
+    def rerank(
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        document_ids: Sequence[str] | None = None,
+        top_k: int | None = None,
+    ) -> list[RetrievalResult]:
+        """Compatibility alias for :meth:`rank`."""
+        return self.rank(query, documents, document_ids=document_ids, top_k=top_k)
+
+    def rank_embeddings(
+        self,
+        query_embedding: np.ndarray | torch.Tensor | Sequence[float],
+        document_embeddings: np.ndarray | torch.Tensor | Sequence[Sequence[float]],
+        *,
+        document_ids: Sequence[str] | None = None,
+        top_k: int | None = None,
+    ) -> list[RetrievalResult]:
+        return self._rank_embeddings(
+            query_embedding=query_embedding,
+            document_embeddings=document_embeddings,
+            document_ids=document_ids,
+            texts=None,
             top_k=top_k,
         )
 
@@ -221,15 +248,15 @@ class IMRNNAdapter:
         document_ids: Sequence[str] | None = None,
         top_k: int | None = None,
     ) -> list[RetrievalResult]:
-        return self._rerank_embeddings(
-            query_embedding=query_embedding,
-            document_embeddings=document_embeddings,
+        """Compatibility alias for :meth:`rank_embeddings`."""
+        return self.rank_embeddings(
+            query_embedding,
+            document_embeddings,
             document_ids=document_ids,
-            texts=None,
             top_k=top_k,
         )
 
-    def _rerank_embeddings(
+    def _rank_embeddings(
         self,
         *,
         query_embedding: np.ndarray | torch.Tensor | Sequence[float],

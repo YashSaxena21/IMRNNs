@@ -68,7 +68,7 @@ class ModelConfig:
 
 
 class IMRNN(nn.Module):
-    """Query/document embedding modulation for dense-retrieval reranking."""
+    """Query/document embedding modulation for interpretable dense retrieval."""
 
     def __init__(self, config: ModelConfig):
         super().__init__()
